@@ -104,9 +104,9 @@ def http_handler(player: mpv.MPV):
                     elif a == "resume":
                         player.pause = False
                     elif a == "volume_up":
-                        player.ao_volume = floor(min(player.ao_volume + 5, 100))
+                        player.volume = floor(min(player.volume + 5, 100))
                     elif a == "volume_down":
-                        player.ao_volume = floor(max(player.ao_volume - 5, 0))
+                        player.volume = floor(max(player.volume - 5, 0))
                     elif a == "quit":
                         player.quit(0)
                 if "text" in opts:
@@ -191,10 +191,11 @@ def generate_page(wfile, player, text):
                 )
             )
         # Volume
-        wfile.write(b'<form class="grid volume">')
-        generate_action_button(wfile, "volume_down")
-        wfile.write(bytes("<span>{:.0f}</span>".format(player.ao_volume), "utf-8"))
-        generate_action_button(wfile, "volume_up")
+        if player.volume is not None:
+            wfile.write(b'<form class="grid volume">')
+            generate_action_button(wfile, "volume_down")
+            wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
+            generate_action_button(wfile, "volume_up")
         wfile.write(b"</form>")
     # Playlist
     wfile.write(b"<ol>")
