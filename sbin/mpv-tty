@@ -1,0 +1,10 @@
+#!/bin/sh
+
+CMD="doas -u test sh /home/test/mpv-http-queue/start.sh" 
+
+if [ -c /dev/tty6 ]; then
+  chvt 6
+  exec $CMD </dev/tty6 >/dev/tty6 2>&1
+else
+  exec openvt -c 6 -s -w $CMD
+fi
