@@ -151,7 +151,7 @@ def generate_page(wfile, player, text):
         )  # Yes this is XSS
     # Add to queue
     wfile.write(
-        b'<form class="grid link"><input name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit></form>'
+        b'<form id="a"></form><form class="grid link"><input form="a" name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit></form>'
     )
     if player.playlist_pos < 0:
         return None
