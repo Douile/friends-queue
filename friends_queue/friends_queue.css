@@ -33,6 +33,10 @@ body > * {
   grid-template-columns: auto 1fr auto;
   align-items: center;
 }
+.volume {
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
 div {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

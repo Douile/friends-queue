@@ -103,6 +103,10 @@ def http_handler(player: mpv.MPV):
                         player.pause = True
                     elif a == "resume":
                         player.pause = False
+                    elif a == "volume_up":
+                        player.ao_volume = floor(min(player.ao_volume + 5, 100))
+                    elif a == "volume_down":
+                        player.ao_volume = floor(max(player.ao_volume - 5, 0))
                     elif a == "quit":
                         player.quit(0)
                 if "text" in opts:
@@ -133,6 +137,12 @@ def http_handler(player: mpv.MPV):
     return HTTPHandler
 
 
+def generate_action_button(wfile, action: str):
+    return wfile.write(
+        bytes('<input type="submit" name="a" value="{}">'.format(action), "utf-8")
+    )
+
+
 def generate_page(wfile, player, text):
     """Generate the body of a page"""
     if len(text) > 0:
@@ -157,9 +167,7 @@ def generate_page(wfile, player, text):
     ]
     wfile.write(b'<form class="actions">')
     for action in actions:
-        wfile.write(
-            bytes('<input type="submit" name="a" value="{}">'.format(action), "utf-8")
-        )
+        generate_action_button(wfile, action)
     wfile.write(b"</form>")
     # Status
     wfile.write(b"<p>")
@@ -168,17 +176,26 @@ def generate_page(wfile, player, text):
     else:
         wfile.write(bytes("Playing {}".format(player.media_title), "utf-8"))
     wfile.write(b"</p>")
+    # If currently playing show seek bar and volume
     if not player.pause and player.time_pos is not None:
-        wfile.write(
-            bytes(
-                '<form class="grid seek-bar"><span>{}</span><input name="seek" type="range" onchange="this.form.submit()" value="{}"><span>{}</span></form>'.format(
-                    seconds_duration(player.time_pos),
-                    player.percent_pos,
-                    seconds_duration(player.time_remaining),
-                ),
-                "utf-8",
+        # Seek bar
+        if player.seekable:
+            wfile.write(
+                bytes(
+                    '<form class="grid seek-bar"><span>{}</span><input name="seek" type="range" onchange="this.form.submit()" value="{}"><span>{}</span></form>'.format(
+                        seconds_duration(player.time_pos),
+                        player.percent_pos,
+                        seconds_duration(player.time_remaining),
+                    ),
+                    "utf-8",
+                )
             )
-        )
+        # Volume
+        wfile.write(b'<form class="grid volume">')
+        generate_action_button(wfile, "volume_down")
+        wfile.write(bytes("<span>{:.0f}</span>".format(player.ao_volume), "utf-8"))
+        generate_action_button(wfile, "volume_up")
+        wfile.write(b"</form>")
     # Playlist
     wfile.write(b"<ol>")
     for item in player.playlist:
