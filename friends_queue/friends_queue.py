@@ -8,6 +8,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import unquote, quote
 import html
 from math import floor
+import os
 
 # Address to listen on
 ADDRESS = ("0.0.0.0", 8000)
@@ -17,21 +18,8 @@ FORMAT_SPECIFIER = (
 )
 
 STYLE = None
-with open("mpv-queue.css", "rb") as f:
+with open(os.path.join(os.path.dirname(__file__), "friends_queue.css"), "rb") as f:
     STYLE = f.read()
-
-# Global player
-# TODO: Make non-global
-player = mpv.MPV(
-    ytdl=True,
-    ytdl_format=FORMAT_SPECIFIER,
-    input_default_bindings=True,
-    input_vo_keyboard=True,
-    osc=True,
-    idle=True,
-    log_handler=print,
-    loglevel="debug",
-)
 
 
 class HTTPThread(threading.Thread):
@@ -211,6 +199,17 @@ def generate_page(wfile, player, text):
 
 
 def main():
+    player = mpv.MPV(
+        ytdl=True,
+        ytdl_format=FORMAT_SPECIFIER,
+        input_default_bindings=True,
+        input_vo_keyboard=True,
+        osc=True,
+        idle=True,
+        log_handler=print,
+        loglevel="debug",
+    )
+
     http = HTTPThread(ADDRESS, http_handler(player))
     http.start()
 
