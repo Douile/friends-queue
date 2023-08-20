@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import mpv
+import yt_dlp
 
 import threading
 import sys
@@ -9,6 +10,9 @@ from urllib.parse import unquote, quote
 import html
 from math import floor
 import os
+
+from .video_queue import VideoQueue
+
 
 # Address to listen on
 ADDRESS = ("0.0.0.0", 8000)
@@ -47,7 +51,7 @@ def seconds_duration(secs: float):
     return "{:02}:{:02}:{:02}".format(floor(hours), floor(mins), floor(secs))
 
 
-def http_handler(player: mpv.MPV):
+def http_handler(player: mpv.MPV, queue: VideoQueue):
     """Create a HTTPHandler class with encapsulated player"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
@@ -66,10 +70,8 @@ def http_handler(player: mpv.MPV):
                 extra = "?"
                 if "link" in opts:
                     redir = True
-                    print("Handle this", opts["link"])
-                    player.playlist_append(opts["link"])
-                    if player.playlist_pos < 0:
-                        player.playlist_pos = player.playlist_count - 1
+                    print("Adding to queue", opts["link"])
+                    queue.append_url(opts["link"])
                 if "a" in opts:
                     redir = True
                     a = opts["a"]
@@ -131,7 +133,7 @@ def http_handler(player: mpv.MPV):
             )
             self.wfile.write(STYLE)
             self.wfile.write(b"</style></head><body>")
-            generate_page(self.wfile, player, text)
+            generate_page(self.wfile, player, queue, text)
             self.wfile.write(b"</body>")
 
     return HTTPHandler
@@ -143,7 +145,7 @@ def generate_action_button(wfile, action: str):
     )
 
 
-def generate_page(wfile, player, text):
+def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     """Generate the body of a page"""
     if len(text) > 0:
         wfile.write(
@@ -190,33 +192,44 @@ def generate_page(wfile, player, text):
                     "utf-8",
                 )
             )
-        # Volume
-        if player.volume is not None:
-            wfile.write(b'<form class="grid volume">')
-            generate_action_button(wfile, "volume_down")
-            wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
-            generate_action_button(wfile, "volume_up")
-        wfile.write(b"</form>")
+    # Volume
+    if player.volume is not None:
+        wfile.write(b'<form class="grid volume">')
+        generate_action_button(wfile, "volume_down")
+        wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
+        generate_action_button(wfile, "volume_up")
+    wfile.write(b"</form>")
     # Playlist
+    player_current = player.playlist_pos
+
     wfile.write(b"<ol>")
-    for item in player.playlist:
+    for i in range(0, len(queue)):
+        item = queue[i]
+        current = i == player_current
+
         content = "<li>"
-        if item.get("current"):
+        if current:
             content += "<strong>"
-        if "title" in item:
+        if item.title is not None:
             content += html.escape(
-                "{} ({})".format(item.get("title"), item.get("filename"))
+                "{} - {} ({}) {}".format(
+                    item.uploader, item.title, item.url, item.duration_str
+                )
             )
         else:
-            content += html.escape(item.get("filename"))
-        if item.get("current"):
+            content += html.escape(item.url)
+        if current:
             content += "</strong>"
         content += "</li>"
         wfile.write(bytes(content, "utf-8"))
     wfile.write(b"</ol>")
 
 
-def main():
+def main(debug=False):
+    extra_args = {}
+    if debug:
+        extra_args["log_handler"] = print
+        extra_args["loglevel"] = "debug"
     player = mpv.MPV(
         ytdl=True,
         ytdl_format=FORMAT_SPECIFIER,
@@ -224,17 +237,22 @@ def main():
         input_vo_keyboard=True,
         osc=True,
         idle=True,
-        log_handler=print,
-        loglevel="debug",
+        **extra_args,
     )
 
-    http = HTTPThread(ADDRESS, http_handler(player))
+    ytdl = yt_dlp.YoutubeDL({"format": FORMAT_SPECIFIER})
+
+    queue = VideoQueue(player, ytdl)
+
+    http = HTTPThread(ADDRESS, http_handler(player, queue))
     http.start()
 
     try:
         player.wait_for_shutdown()
     except Exception as e:
         print(e)
+
+    del player
 
     print("Shutting down")
     http.shutdown()
