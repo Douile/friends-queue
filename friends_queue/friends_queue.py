@@ -42,7 +42,7 @@ class HTTPThread(threading.Thread):
         self.httpd.shutdown()
 
 
-def seconds_duration(secs: float):
+def seconds_duration(secs: float) -> str:
     """Convert time in seconds to duration of hh:mm:ss"""
     if secs is None:
         return ""
@@ -201,11 +201,26 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     wfile.write(b"</form>")
     # Playlist
     player_current = player.playlist_pos
+    time_before = 0
+    time_after = 0
+    after_current = False
 
     wfile.write(b"<ol>")
     for i in range(0, len(queue)):
         item = queue[i]
         current = i == player_current
+        if current:
+            after_current = True
+            pos = player.time_pos
+            if pos is not None:
+                time_before += pos
+                time_after += player.time_remaining
+            elif item.duration is not None:
+                time_after += item.duration
+        elif after_current and item.duration is not None:
+            time_after += item.duration
+        elif item.duration is not None:
+            time_before += item.duration
 
         content = "<li>"
         if current:
@@ -223,6 +238,14 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         content += "</li>"
         wfile.write(bytes(content, "utf-8"))
     wfile.write(b"</ol>")
+    wfile.write(
+        bytes(
+            '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div'.format(
+                seconds_duration(time_before), seconds_duration(time_after)
+            ),
+            "utf-8",
+        )
+    )
 
 
 def main(debug=False):
