@@ -155,8 +155,6 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     wfile.write(
         b'<form id="a"></form><form class="grid link"><input form="a" name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit></form>'
     )
-    if player.playlist_pos < 0:
-        return None
     # Actions
     actions = [
         "info",
@@ -171,6 +169,9 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     for action in actions:
         generate_action_button(wfile, action)
     wfile.write(b"</form>")
+
+    if player.playlist_pos < 0:
+        return None
     # Status
     wfile.write(b"<p>")
     if player.pause:
