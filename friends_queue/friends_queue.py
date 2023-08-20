@@ -58,6 +58,14 @@ def http_handler(player: mpv.MPV, queue: VideoQueue):
         def do_GET(self):
             text = ""
             i = self.path.find("?")
+
+            path = self.path[:i] if i > -1 else self.path
+            # 404
+            if path != "/":
+                self.send_error(404)
+                self.end_headers()
+                return None
+
             if i > -1:
                 query = self.path[i + 1 :]
                 opts = {}
