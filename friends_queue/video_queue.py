@@ -54,7 +54,7 @@ class VideoQueue(List[VideoQueueItem]):
 
 class FetchVideoThread(Thread):
     def __init__(self, ytdl: yt_dlp.YoutubeDL, item: VideoQueueItem):
-        super().__init__()
+        super().__init__(daemon=True)
         self._ytdl = ytdl
         self._item = item
 
