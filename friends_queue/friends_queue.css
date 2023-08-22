@@ -65,6 +65,7 @@ body > * {
 }
 .queue-item > img {
   grid-area: b;
+  width: 5em;
 }
 .queue-item > .title {
   grid-area: c;

@@ -242,7 +242,8 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         content += '">'
 
         if item.title is not None:
-            content += "<img>"
+            if item.thumbnail is not None:
+                content += '<img src="{}">'.format(html.escape(item.thumbnail, True))
             content += '<span class="title">{} - {}</span>'.format(
                 html.escape(item.uploader), html.escape(item.title)
             )

@@ -4,6 +4,9 @@ import yt_dlp
 from typing import List
 from dataclasses import dataclass
 from threading import Thread
+from urllib.request import urlopen
+from http.client import HTTPResponse
+import base64
 
 
 @dataclass
@@ -52,6 +55,16 @@ class VideoQueue(List[VideoQueueItem]):
         self._player.playlist_move(item, to)
 
 
+def choose_thumbnail(thumbnails):
+    if thumbnails is None:
+        return None
+    for thumb in thumbnails:
+        width = thumb.get("width")
+        if width is not None and width > 300 and "url" in thumb:
+            return thumb["url"]
+    return None
+
+
 class FetchVideoThread(Thread):
     def __init__(self, ytdl: yt_dlp.YoutubeDL, item: VideoQueueItem):
         super().__init__(daemon=True)
@@ -59,13 +72,29 @@ class FetchVideoThread(Thread):
         self._item = item
 
     def run(self):
+        # Fetch video info
         info = self._ytdl.extract_info(self._item.url, download=False)
         self._item.title = info.get("fulltitle")
         self._item.uploader = info.get("uploader")
         self._item.stream_url = None  # TODO
         self._item.duration = info.get("duration")
         self._item.duration_str = info.get("duration_string")
-        self._item.thumbnail = info.get("thumbnail")  # TODO: Select thumbnail res
+
+        # Fetch video thumbnail (as base64)
+        thumbnail = choose_thumbnail(info.get("thumbnails"))
+        if thumbnail is not None:
+            res: HTTPResponse = urlopen(thumbnail)
+            if not isinstance(res, HTTPResponse):
+                raise Exception("Expected HTTP response")
+            if res.status != 200:
+                raise Exception("Bad image status code")
+            content_type = res.headers["content-type"]
+            self._item.thumbnail = (
+                "data:"
+                + content_type
+                + ";base64,"
+                + str(base64.b64encode(res.read()), "utf-8")
+            )
 
 
 def fetch_video(ytdl: yt_dlp.YoutubeDL, url: str) -> VideoQueueItem:
