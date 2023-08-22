@@ -11,7 +11,7 @@ import html
 from math import floor
 import os
 
-from .video_queue import VideoQueue
+from .video_queue import VideoQueue, VideoQueueItem
 
 
 # Address to listen on
@@ -124,6 +124,11 @@ def http_handler(player: mpv.MPV, queue: VideoQueue):
                 if "seek" in opts:
                     redir = True
                     player.seek(opts["seek"], "absolute-percent+keyframes")
+                if "pos" in opts:
+                    redir = True
+                    new_pos = int(opts["pos"])
+                    if player.playlist_pos != new_pos:
+                        player.playlist_pos = new_pos
                 if redir:
                     self.send_response(302)
                     path = self.path[:i]
@@ -214,7 +219,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     time_after = 0
     after_current = False
 
-    wfile.write(b"<ol>")
+    wfile.write(b'<div class="queue">')
     for i in range(0, len(queue)):
         item = queue[i]
         current = i == player_current
@@ -231,22 +236,25 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         elif item.duration is not None:
             time_before += item.duration
 
-        content = "<li>"
+        content = '<a href="?pos={}" class="queue-item'.format(i)
         if current:
-            content += "<strong>"
+            content += " current"
+        content += '">'
+
         if item.title is not None:
-            content += html.escape(
-                "{} - {} ({}) {}".format(
-                    item.uploader, item.title, item.url, item.duration_str
-                )
+            content += "<img>"
+            content += '<span class="title">{} - {}</span>'.format(
+                html.escape(item.uploader), html.escape(item.title)
             )
+            content += '<span class="duration">{}</span>'.format(
+                html.escape(item.duration_str)
+            )
+            content += '<span class="link">{0}</span>'.format(html.escape(item.url))
         else:
             content += html.escape(item.url)
-        if current:
-            content += "</strong>"
-        content += "</li>"
+        content += "</a>"
         wfile.write(bytes(content, "utf-8"))
-    wfile.write(b"</ol>")
+    wfile.write(b"</div>")
     wfile.write(
         bytes(
             '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div'.format(
