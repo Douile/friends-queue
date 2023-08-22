@@ -10,14 +10,17 @@ A python web server that uses [libmpv](https://github.com/jaseg/python-mpv) to s
 - 10 second quick seek
 - Pause/resume
 - Seek bar
+- Volume control
+- Video thumbnails
+- Total queue time
 
 ## Screenshot
 
-<center>
+<div style="text-align:center">
 
-![Screenshot](./DOCS/screenshot-1.png)
+![Screenshot](./DOCS/screenshot-2.png)
 
-</center>
+</div>
 
 ## LICENSE
 
