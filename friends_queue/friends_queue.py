@@ -166,7 +166,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         )  # Yes this is XSS
     # Add to queue
     wfile.write(
-        b'<form id="a"></form><form class="grid link"><input form="a" name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit></form>'
+        b'<form id="a"></form><form class="grid link"><input form="a" name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit value="play"></form>'
     )
     # Actions
     actions = [
@@ -281,7 +281,13 @@ def main(debug=False):
         **extra_args,
     )
 
-    ytdl = yt_dlp.YoutubeDL({"format": FORMAT_SPECIFIER})
+    ytdl = yt_dlp.YoutubeDL(
+        {
+            "format": FORMAT_SPECIFIER,
+            "skip_download": True,
+            "noplaylist": True,
+        }
+    )
 
     queue = VideoQueue(player, ytdl)
 
