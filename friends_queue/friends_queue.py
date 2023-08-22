@@ -14,6 +14,8 @@ import os
 from .video_queue import VideoQueue, VideoQueueItem
 
 
+SRC_DIR = os.path.dirname(__file__)
+
 # Address to listen on
 ADDRESS = ("0.0.0.0", 8000)
 # Specify which format to select https://github.com/yt-dlp/yt-dlp#format-selection
@@ -21,9 +23,10 @@ FORMAT_SPECIFIER = (
     "bv[height<=720][vbr<2000][fps<=30]+ba[abr<=62]/b[height<=720][fps<=30]"
 )
 
-STYLE = None
-with open(os.path.join(os.path.dirname(__file__), "friends_queue.css"), "rb") as f:
+with open(os.path.join(SRC_DIR, "friends_queue.css"), "rb") as f:
     STYLE = f.read()
+with open(os.path.join(SRC_DIR, "friends_queue.js"), "rb") as f:
+    JS = f.read()
 
 
 class HTTPThread(threading.Thread):
@@ -145,7 +148,9 @@ def http_handler(player: mpv.MPV, queue: VideoQueue):
                 b'<!DOCTYPE HTML>\n<html lang="en"><head><title>Friends Queue</title><meta name="viewport" content="width=device-width,initial-scale=1"/><style>'
             )
             self.wfile.write(STYLE)
-            self.wfile.write(b"</style></head><body>")
+            self.wfile.write(b"</style><script>")
+            self.wfile.write(JS)
+            self.wfile.write(b"</script></head><body>")
             generate_page(self.wfile, player, queue, text)
             self.wfile.write(b"</body>")
 
@@ -198,8 +203,9 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         if player.seekable:
             wfile.write(
                 bytes(
-                    '<form class="grid seek-bar"><span>{}</span><input name="seek" type="range" onchange="this.form.submit()" value="{}"><span>{}</span></form>'.format(
+                    '<form class="grid seek-bar"><span>{}</span><input name="seek" type="range" onchange="this.form.submit()" oninput="updateSeekTimes(this)" data-duration="{}" value="{}"><span>{}</span></form>'.format(
                         seconds_duration(player.time_pos),
+                        player.duration,
                         player.percent_pos,
                         seconds_duration(player.time_remaining),
                     ),
