@@ -1,3 +1,5 @@
+"""Manage the queue of videos"""
+
 from typing import List
 from dataclasses import dataclass
 from threading import Thread
@@ -35,6 +37,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._thumbs = thumbnails
 
     def append(self, item: VideoQueueItem):
+        """Append a new video item to queue and add to mpv playlist"""
         assert item is not None
         super().append(item)
 
@@ -47,9 +50,10 @@ class VideoQueue(List[VideoQueueItem]):
 
     def append_url(self, url: str):
         """Fetch video URL and asyncronously append to queue"""
-        fetch_video(self._ytdl, self._thumbs, self, url)
+        __fetch_video(self._ytdl, self._thumbs, self, url)
 
     def move(self, item_index: int, new_index: int):
+        """Move queue items"""
         assert 0 <= item_index < len(self)
         assert 0 <= new_index < len(self)
 
@@ -68,7 +72,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._player.playlist_move(item_index, new_index)
 
 
-def choose_thumbnail(thumbnails):
+def __choose_thumbnail(thumbnails):
     if thumbnails is None:
         return None
     for thumb in thumbnails:
@@ -78,7 +82,7 @@ def choose_thumbnail(thumbnails):
     return None
 
 
-def get_stream_urls(info):
+def __get_stream_urls(info):
     video = None
     audio = None
 
@@ -94,6 +98,8 @@ def get_stream_urls(info):
 
 
 class FetchVideoThread(Thread):
+    """Thread to fetch video info with ytdl"""
+
     def __init__(
         self,
         ytdl: yt_dlp.YoutubeDL,
@@ -119,7 +125,7 @@ class FetchVideoThread(Thread):
         self._item.duration = info.get("duration")
         self._item.duration_str = info.get("duration_string")
 
-        video, audio = get_stream_urls(info)
+        video, audio = __get_stream_urls(info)
         self._item.video_url = video.get("url")
         self._item.audio_url = audio.get("url")
         # TODO: Add other metadata added by ytdl_hook e.g. subtitles, chapters, bitrate
@@ -129,12 +135,12 @@ class FetchVideoThread(Thread):
         self._queue.append(self._item)
 
         # Fetch video thumbnail (as base64)
-        thumbnail = choose_thumbnail(info.get("thumbnails"))
+        thumbnail = __choose_thumbnail(info.get("thumbnails"))
         if thumbnail is not None:
             self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail)
 
 
-def fetch_video(
+def __fetch_video(
     ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache, queue: VideoQueue, url: str
 ) -> VideoQueueItem:
     item = VideoQueueItem(url)

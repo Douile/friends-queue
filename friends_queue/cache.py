@@ -1,3 +1,5 @@
+"""Cache dir management"""
+
 from os import mkdir
 import os.path
 import tempfile
@@ -7,6 +9,8 @@ from shutil import rmtree
 
 @dataclass
 class CacheDirs:
+    """Cache dir locations, will be deleted on object deletion"""
+
     base: str
     thumbs: str
     ytdl: str

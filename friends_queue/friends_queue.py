@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Friend's Queue"""
 
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -6,13 +7,17 @@ from urllib.parse import unquote, quote
 import html
 from math import floor
 import os.path
+from collections.abc import Mapping
+from dataclasses import dataclass
 
 import mpv
 import yt_dlp
 
+from .actions import ACTIONS
 from .cache import make_cache_dirs
 from .video_queue import VideoQueue
 from .thumbnail_cache import ThumbnailCache
+from .utils import parse_search_query
 
 SRC_DIR = os.path.dirname(__file__)
 
@@ -42,6 +47,7 @@ class HTTPThread(threading.Thread):
         self.httpd.serve_forever()
 
     def shutdown(self):
+        """Shut down http listening thread"""
         self.httpd.shutdown()
 
 
@@ -49,115 +55,113 @@ def seconds_duration(secs: float) -> str:
     """Convert time in seconds to duration of hh:mm:ss"""
     if secs is None:
         return ""
-    hours, r = divmod(secs, 3600)
-    mins, secs = divmod(r, 60)
-    return "{:02}:{:02}:{:02}".format(floor(hours), floor(mins), floor(secs))
+    hours, remains = divmod(secs, 3600)
+    mins, secs = divmod(remains, 60)
+    return f"{floor(hours):02}:{floor(mins):02}:{floor(secs):02}"
+
+
+@dataclass
+class RequestState:
+    """Active request state"""
+
+    options: Mapping[str, str] = None
+    redirect: bool = False
+    location_extra: str = "?"
+    text: str = ""
 
 
 def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
     """Create a HTTPHandler class with encapsulated player"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
-        # pylint: disable=invalid-name
+        """Custom HTTP request handler"""
+
+        # pylint: disable-next=invalid-name
         def do_GET(self):
-            text = ""
+            """Handle get requests"""
+
+            state = RequestState()
             i = self.path.find("?")
 
             path = self.path[:i] if i > -1 else self.path
             if ThumbnailCache.is_thumbnail_url(path):
-                return thumbs.handle_request(self, path)
+                thumbs.handle_request(self, path)
+                return
             if path != "/":
                 # 404
                 self.send_error(404)
                 self.end_headers()
-                return None
+                return
 
             if i > -1:
                 query = self.path[i + 1 :]
-                opts = {}
-                for part in query.split("&"):
-                    parts = part.split("=")
-                    if len(parts) == 2:
-                        [key, value] = parts
-                        opts[key] = unquote(value)
-                redir = False
-                extra = "?"
-                if "link" in opts:
-                    redir = True
-                    print("Adding to queue", opts["link"])
-                    queue.append_url(opts["link"])
-                if "a" in opts:
-                    redir = True
-                    a = opts["a"]
-                    if a == "info":
-                        extra += (
-                            "text="
-                            + quote(
-                                "Playing {} {}% ({} {} {} {}x{}) Drop(dec={}, frame={})".format(
-                                    player.media_title,
-                                    player.percent_pos,
-                                    player.video_format,
-                                    player.video_codec,
-                                    player.hwdec_current,
-                                    player.width,
-                                    player.height,
-                                    player.decoder_frame_drop_count,
-                                    player.frame_drop_count,
-                                )
-                            )
-                            + "&"
-                        )
-                    elif a == "seek_backward":
-                        player.seek("-10", "relative+keyframes")
-                    elif a == "seek_forward":
-                        player.seek("10", "relative+keyframes")
-                    elif a == "prev":
-                        player.playlist_prev("force")
-                    elif a == "skip":
-                        player.playlist_next("force")
-                    elif a == "pause":
-                        player.pause = True
-                    elif a == "resume":
-                        player.pause = False
-                    elif a == "volume_up":
-                        player.volume = floor(min(player.volume + 5, 100))
-                    elif a == "volume_down":
-                        player.volume = floor(max(player.volume - 5, 0))
-                    elif a == "quit":
-                        player.quit(0)
-                if "text" in opts:
-                    text = unquote(opts["text"])
-                if "seek" in opts:
-                    redir = True
-                    player.seek(opts["seek"], "absolute-percent+keyframes")
-                if "pos" in opts:
-                    redir = True
-                    new_pos = int(opts["pos"])
-                    if player.playlist_pos != new_pos:
-                        player.playlist_pos = new_pos
-                if redir:
+                state.options = parse_search_query(query)
+                handle_options(state, player, queue)
+                if state.redirect:
                     self.send_response(302)
                     path = self.path[:i]
-                    if len(extra) > 1:
-                        path += extra
+                    if len(state.extra) > 1:
+                        path += state.extra
                     self.send_header("Location", path)
                     self.end_headers()
-                    return None
+                    return
 
+            # Normal response
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
+            # Document headings
             self.wfile.write(
-                b'<!DOCTYPE HTML>\n<html lang="en"><head><title>Friends Queue</title><meta name="viewport" content="width=device-width,initial-scale=1"/><meta charset="utf-8"><style>'
+                b'<!DOCTYPE HTML>\n<html lang="en"><head>'
+                + b"<title>Friends Queue</title>"
+                + b'<meta name="viewport" content="width=device-width,initial-scale=1">'
+                + b'<meta charset="utf-8">'
             )
+            # Stylesheet and javascript
+            self.wfile.write(b"<style>")
             self.wfile.write(STYLE)
             self.wfile.write(b"</style><script>")
             self.wfile.write(JS)
             self.wfile.write(b"</script></head><body>")
-            generate_page(self.wfile, player, queue, text)
+            # Page content
+            generate_page(self.wfile, player, queue, state.text)
             self.wfile.write(b"</body>")
 
     return HTTPHandler
+
+
+def handle_options(state: RequestState, player: mpv.MPV, queue: VideoQueue):
+    """Handle request query options"""
+    opts = state.options
+    if "link" in opts:
+        state.redirect = True
+        print("Adding to queue", opts["link"])
+        queue.append_url(opts["link"])
+    if "a" in opts:
+        state.redirect = True
+        action = opts["a"]
+        if action == "info":
+            state.location_extra += (
+                "text="
+                + quote(
+                    f"Playing {player.media_title} {player.percent_pos}% ({player.video_format} {player.video_codec} {player.hwdec_current} {player.width}x{player.height}) Drop(dec={player.decoder_frame_drop_count}, frame={player.frame_drop_count})"
+                )
+                + "&"
+            )
+        else:
+            act = ACTIONS.get(action)
+            if act is not None:
+                act(player)
+    if "text" in opts:
+        state.text = unquote(opts["text"])
+    if "seek" in opts:
+        state.redirect = True
+        player.seek(opts["seek"], "absolute-percent+keyframes")
+    if "pos" in opts:
+        state.redirect = True
+        new_pos = int(opts["pos"])
+        if player.playlist_pos != new_pos:
+            player.playlist_pos = new_pos
 
 
 def generate_action_button(wfile, action: str, text: str = None, extra: str = None):
@@ -176,6 +180,9 @@ def generate_action_button(wfile, action: str, text: str = None, extra: str = No
 
 def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     """Generate the body of a page"""
+    # TODO: Separate into smaller functions
+    # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+
     if len(text) > 0:
         wfile.write(
             bytes("<p>{}</p>".format(html.escape(text)), "utf-8")
@@ -214,17 +221,28 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     if not player.pause and player.time_pos is not None:
         # Seek bar
         if player.seekable:
+            wfile.write(b'<form class="grid seek-bar">')
             wfile.write(
                 bytes(
-                    '<form class="grid seek-bar"><span>{}</span><input name="seek" type="range" onchange="this.form.submit()" oninput="updateSeekTimes(this)" data-duration="{}" value="{}"><span>{}</span></form>'.format(
-                        seconds_duration(player.time_pos),
+                    "<span>{}</span>".format(seconds_duration(player.time_pos)), "utf-8"
+                )
+            )
+            wfile.write(
+                bytes(
+                    '<input name="seek" type="range" onchange="this.form.submit()" oninput="updateSeekTimes(this)" data-duration="{}" value="{}">'.format(
                         player.duration,
                         player.percent_pos,
-                        seconds_duration(player.time_remaining),
                     ),
                     "utf-8",
                 )
             )
+            wfile.write(
+                bytes(
+                    "<span>{}</span>".format(seconds_duration(player.time_remaining)),
+                    "utf-8",
+                )
+            )
+            wfile.write(b"</form>")
     # Volume
     if player.volume is not None:
         wfile.write(b'<form class="grid volume">')
@@ -239,8 +257,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     after_current = False
 
     wfile.write(b'<div class="queue">')
-    for i in range(0, len(queue)):
-        item = queue[i]
+    for i, item in enumerate(queue):
         current = i == player_current
         if current:
             after_current = True
@@ -287,6 +304,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
 
 
 def main(debug=False, search=True):
+    """Main func"""
     cache_dirs = make_cache_dirs()
 
     extra_args = {}
@@ -322,8 +340,8 @@ def main(debug=False, search=True):
 
     try:
         player.wait_for_shutdown()
-    except Exception as e:
-        print(e)
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        print(error)
 
     del player
 

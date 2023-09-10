@@ -1,3 +1,5 @@
+"""Caching for thumbnails"""
+
 import os.path
 from dataclasses import dataclass
 from urllib.request import urlopen
@@ -15,8 +17,14 @@ CACHE_MAX_AGE = 60 * 60 * 24  # 24 hours
 CACHE_CONTROL = "private, max_age={}".format(CACHE_MAX_AGE)
 
 
+class HTTPException(Exception):
+    """HTTP related error"""
+
+
 @dataclass
 class ThumbnailItem:
+    """Cached thumbnail data"""
+
     file: FileIO
     content_type: str
     content_len: int
@@ -34,24 +42,24 @@ class ThumbnailCache:
 
     def cache_thumbnail(self, url: str) -> str:
         """Download an image from URL and return path to fetch from cache"""
-        res: HTTPResponse = urlopen(url)
-        if not isinstance(res, HTTPResponse):
-            raise Exception("Expected HTTP response")
-        if res.status != 200:
-            raise Exception("Bad image status code")
-        content_length = res.headers.get("content-length")
-        if content_length is not None:
-            content_length = int(content_length)
-        content_type = res.headers.get_content_type()
-        if content_type is None or not content_type.startswith("image/"):
-            raise Exception(
-                "Thumbnail URL returned content-type that is not an image: "
-                + str(content_type)
-            )
-        thumb_hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
-        file_path = os.path.join(self._cache_dir, thumb_hash)
-        with open(file_path, "wb") as file:
-            copyfileobj(res, file, length=content_length)
+        with urlopen(url) as res:
+            if not isinstance(res, HTTPResponse):
+                raise HTTPException("Expected HTTP response")
+            if res.status != 200:
+                raise HTTPException("Bad image status code")
+            content_length = res.headers.get("content-length")
+            if content_length is not None:
+                content_length = int(content_length)
+            content_type = res.headers.get_content_type()
+            if content_type is None or not content_type.startswith("image/"):
+                raise HTTPException(
+                    "Thumbnail URL returned content-type that is not an image: "
+                    + str(content_type)
+                )
+            thumb_hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
+            file_path = os.path.join(self._cache_dir, thumb_hash)
+            with open(file_path, "wb") as file:
+                copyfileobj(res, file, length=content_length)
         # pylint: disable=consider-using-with
         file = open(file_path, "rb")
         if content_length is None:
@@ -99,4 +107,5 @@ class ThumbnailCache:
 
     @staticmethod
     def is_thumbnail_url(path: str) -> bool:
+        """Check if a path references a thumbnail"""
         return path.startswith(THUMBNAIL_PREFIX)
