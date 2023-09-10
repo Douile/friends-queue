@@ -286,7 +286,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     )
 
 
-def main(debug=False):
+def main(debug=False, search=True):
     cache_dirs = make_cache_dirs()
 
     extra_args = {}
@@ -304,14 +304,15 @@ def main(debug=False):
         **extra_args,
     )
 
-    ytdl = yt_dlp.YoutubeDL(
-        {
-            "format": FORMAT_SPECIFIER,
-            "skip_download": True,
-            "noplaylist": True,
-            "cachedir": cache_dirs.ytdl,
-        }
-    )
+    yt_args = {
+        "format": FORMAT_SPECIFIER,
+        "skip_download": True,
+        "cachedir": cache_dirs.ytdl,
+    }
+    if search:
+        yt_args["default_search"] = "auto"
+
+    ytdl = yt_dlp.YoutubeDL(yt_args)
 
     thumbnails = ThumbnailCache(cache_dirs.thumbs)
     queue = VideoQueue(player, ytdl, thumbnails)

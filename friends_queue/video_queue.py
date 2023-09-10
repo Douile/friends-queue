@@ -109,6 +109,10 @@ class FetchVideoThread(Thread):
     def run(self):
         # Fetch video info
         info = self._ytdl.extract_info(self._item.url, download=False)
+
+        if info.get("_type") == "playlist":
+            info = info.get("entries")[0]
+
         self._item.title = info.get("fulltitle")
         self._item.uploader = info.get("uploader")
         self._item.duration = info.get("duration")
