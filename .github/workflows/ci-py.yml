@@ -10,15 +10,20 @@ on:
     branches: ["main"]
     paths:
       - '**/*.py'
+  workflow_dispatch:
 
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Lint and format
-        uses: ricardochaves/python-lint@v1.4.0
+      - uses: actions/setup-python@v4
         with:
-          python-root-list: friends_queue
-          use-pylint: true
-          use-black: true
+          python-version: '3.11'
+          cache: 'pip' # caching pip dependencies
+      - name: Install linters
+        run: pip install pylint==2.17.5 black==23.7.0
+      - name: Lint
+        run: pylint friends_queue
+      - name: Check formatting
+        run: black --check friends_queue
