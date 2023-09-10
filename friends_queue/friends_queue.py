@@ -293,6 +293,7 @@ def main(debug=False):
     if debug:
         extra_args["log_handler"] = print
         extra_args["loglevel"] = "debug"
+    extra_args["script_opts"] = "ytdl_hook-cachedir=" + cache_dirs.ytdl
     player = mpv.MPV(
         ytdl=True,
         ytdl_format=FORMAT_SPECIFIER,
@@ -308,7 +309,7 @@ def main(debug=False):
             "format": FORMAT_SPECIFIER,
             "skip_download": True,
             "noplaylist": True,
-            "cache_dir": cache_dirs.ytdl,
+            "cachedir": cache_dirs.ytdl,
         }
     )
 
