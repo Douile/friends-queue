@@ -100,8 +100,8 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
                 if state.redirect:
                     self.send_response(302)
                     path = self.path[:i]
-                    if len(state.extra) > 1:
-                        path += state.extra
+                    if len(state.location_extra) > 1:
+                        path += state.location_extra
                     self.send_header("Location", path)
                     self.end_headers()
                     return

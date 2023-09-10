@@ -19,7 +19,7 @@ class CacheDirs:
         rmtree(self.base)
 
 
-def __make_cache_dir(base: str, name: str) -> str:
+def _make_cache_dir(base: str, name: str) -> str:
     directory = os.path.join(base, name)
     mkdir(directory)
     return directory
@@ -33,6 +33,6 @@ def make_cache_dirs(base_dir: str = None):
         base_dir = os.path.abspath(base_dir)
     return CacheDirs(
         base_dir,
-        __make_cache_dir(base_dir, "thumbnails"),
-        __make_cache_dir(base_dir, "ytdl"),
+        _make_cache_dir(base_dir, "thumbnails"),
+        _make_cache_dir(base_dir, "ytdl"),
     )

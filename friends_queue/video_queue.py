@@ -50,7 +50,7 @@ class VideoQueue(List[VideoQueueItem]):
 
     def append_url(self, url: str):
         """Fetch video URL and asyncronously append to queue"""
-        __fetch_video(self._ytdl, self._thumbs, self, url)
+        _fetch_video(self._ytdl, self._thumbs, self, url)
 
     def move(self, item_index: int, new_index: int):
         """Move queue items"""
@@ -72,7 +72,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._player.playlist_move(item_index, new_index)
 
 
-def __choose_thumbnail(thumbnails):
+def _choose_thumbnail(thumbnails):
     if thumbnails is None:
         return None
     for thumb in thumbnails:
@@ -82,7 +82,7 @@ def __choose_thumbnail(thumbnails):
     return None
 
 
-def __get_stream_urls(info):
+def _get_stream_urls(info):
     video = None
     audio = None
 
@@ -117,6 +117,9 @@ class FetchVideoThread(Thread):
         # Fetch video info
         info = self._ytdl.extract_info(self._item.url, download=False)
 
+        if info is None:
+            return  # TODO: handle error
+
         if info.get("_type") == "playlist":
             info = info.get("entries")[0]
 
@@ -125,7 +128,7 @@ class FetchVideoThread(Thread):
         self._item.duration = info.get("duration")
         self._item.duration_str = info.get("duration_string")
 
-        video, audio = __get_stream_urls(info)
+        video, audio = _get_stream_urls(info)
         self._item.video_url = video.get("url")
         self._item.audio_url = audio.get("url")
         # TODO: Add other metadata added by ytdl_hook e.g. subtitles, chapters, bitrate
@@ -135,12 +138,12 @@ class FetchVideoThread(Thread):
         self._queue.append(self._item)
 
         # Fetch video thumbnail (as base64)
-        thumbnail = __choose_thumbnail(info.get("thumbnails"))
+        thumbnail = _choose_thumbnail(info.get("thumbnails"))
         if thumbnail is not None:
             self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail)
 
 
-def __fetch_video(
+def _fetch_video(
     ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache, queue: VideoQueue, url: str
 ) -> VideoQueueItem:
     item = VideoQueueItem(url)
