@@ -160,9 +160,17 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
     return HTTPHandler
 
 
-def generate_action_button(wfile, action: str):
+def generate_action_button(wfile, action: str, text: str = None, extra: str = None):
+    """Generate a button that can be clicked to trigger an action"""
     return wfile.write(
-        bytes('<input type="submit" name="a" value="{}">'.format(action), "utf-8")
+        bytes(
+            '<button {} type="submit" name="a" value="{}">{}</button>'.format(
+                extra or "",
+                html.escape(action, quote=True),
+                html.escape(text or action),
+            ),
+            "utf-8",
+        )
     )
 
 
@@ -173,22 +181,24 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
             bytes("<p>{}</p>".format(html.escape(text)), "utf-8")
         )  # Yes this is XSS
     # Add to queue
-    wfile.write(
-        b'<form id="a"></form><form class="grid link"><input form="a" name="a" value="quit" type=submit><input type=text name=link placeholder="Play link"><input type=submit value="play"></form>'
-    )
+    wfile.write(b'<form id="a"></form><form class="grid link">')
+    generate_action_button(wfile, "quit", "Quit", "form=a")
+    wfile.write(b'<input type=text name=link placeholder="Play link">')
+    generate_action_button(wfile, "play", "Play")
+    wfile.write(b"</form>")
     # Actions
     actions = [
-        "info",
-        "prev",
-        "skip",
-        "seek_backward",
-        "seek_forward",
-        "pause",
-        "resume",
+        ("info", "Info"),
+        ("prev", "⏮︎ Previous"),
+        ("skip", "⏭︎ Next"),
+        ("seek_backward", "⏪︎Seek -10s"),
+        ("seek_forward", " ⏩︎Seek +10s"),
+        ("pause", "⏸︎ Pause"),
+        ("resume", "⏵︎ Resume"),
     ]
     wfile.write(b'<form class="actions">')
-    for action in actions:
-        generate_action_button(wfile, action)
+    for action, text in actions:
+        generate_action_button(wfile, action, text)
     wfile.write(b"</form>")
 
     if player.playlist_pos < 0:
@@ -218,9 +228,9 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     # Volume
     if player.volume is not None:
         wfile.write(b'<form class="grid volume">')
-        generate_action_button(wfile, "volume_down")
+        generate_action_button(wfile, "volume_down", "Decrease Volume")
         wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
-        generate_action_button(wfile, "volume_up")
+        generate_action_button(wfile, "volume_up", "Increase Volume")
         wfile.write(b"</form>")
     # Playlist
     player_current = player.playlist_pos
@@ -252,9 +262,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
 
         if item.title is not None:
             if item.thumbnail is not None:
-                content += '<img src="{}" loading="lazy">'.format(
-                    html.escape(item.thumbnail, True)
-                )
+                content += '<img src="{}">'.format(html.escape(item.thumbnail, True))
             content += '<span class="title">'
             if item.uploader is not None:
                 content += "{} - ".format(html.escape(item.uploader))
