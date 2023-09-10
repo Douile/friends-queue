@@ -292,6 +292,14 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
             content += html.escape(item.url)
         content += "</a>"
         wfile.write(bytes(content, "utf-8"))
+    # Currently fetching
+    for active in queue.active_fetches():
+        wfile.write(
+            bytes(
+                '<div class="queue-item loading">{}</div>'.format(html.escape(active)),
+                "utf-8",
+            )
+        )
     wfile.write(b"</div>")
     wfile.write(
         bytes(

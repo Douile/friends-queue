@@ -3,6 +3,7 @@
 from typing import List
 from dataclasses import dataclass
 from threading import Thread
+from collections.abc import Sequence
 
 import mpv
 import yt_dlp
@@ -35,6 +36,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._player = player
         self._ytdl = ytdl
         self._thumbs = thumbnails
+        self._active: list[FetchVideoThread] = []
 
     def append(self, item: VideoQueueItem):
         """Append a new video item to queue and add to mpv playlist"""
@@ -70,6 +72,14 @@ class VideoQueue(List[VideoQueueItem]):
         self[new_index] = item_value
 
         self._player.playlist_move(item_index, new_index)
+
+    def active_fetches(self) -> Sequence[str]:
+        """Get currently active fetches"""
+        for i, thread in enumerate(self._active):
+            if not thread.is_in_queue():
+                yield thread.url()
+            else:
+                self._active.pop(i)
 
 
 def _choose_thumbnail(thumbnails):
@@ -112,8 +122,10 @@ class FetchVideoThread(Thread):
         self._thumbs = thumbnails
         self._queue = queue
         self._item = item
+        self._is_in_queue = False
 
     def run(self):
+        self._queue._active.append(self)
         # Fetch video info
         info = self._ytdl.extract_info(self._item.url, download=False)
 
@@ -136,11 +148,20 @@ class FetchVideoThread(Thread):
         # Append before fetching thumbnail as that requires another request and is not required to
         # play the video
         self._queue.append(self._item)
+        self._is_in_queue = True
 
         # Fetch video thumbnail (as base64)
         thumbnail = _choose_thumbnail(info.get("thumbnails"))
         if thumbnail is not None:
             self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail)
+
+    def url(self) -> str:
+        """Get the URL being fetched"""
+        return self._item.url
+
+    def is_in_queue(self) -> bool:
+        """Whether enough info has been fetched to add item to video queue"""
+        return self._is_in_queue
 
 
 def _fetch_video(
