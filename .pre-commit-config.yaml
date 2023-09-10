@@ -8,6 +8,7 @@ repos:
         entry: pylint
         language: system
         types: [python]
+        files: "friends_queue/"
         args: [
             "-rn", # Only display messages
             "-sn", # Don't display the score
