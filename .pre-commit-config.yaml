@@ -1,28 +1,27 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
-- repo: local
-  hooks:
-    - id: pylint
-      name: pylint
-      entry: pylint
-      language: system
-      types: [python]
-      args:
-        [
-          "-rn", # Only display messages
-          "-sn", # Don't display the score
-          "--load-plugins=pylint.extensions.docparams",
-        ]
-    - id: black
-      name: black (python formatting)
-      entry: black
-      language: system
-      types: [python]
-      args: [ "--check" ]
-    - id: prettier
-      name: prettier (JS formatting)
-      entry: prettier
-      language: system
-      types: [javascript, html, css]
-      args: [ "--check" ]
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint
+        entry: pylint
+        language: system
+        types: [python]
+        args: [
+            "-rn", # Only display messages
+            "-sn", # Don't display the score
+            "--load-plugins=pylint.extensions.docparams",
+          ]
+      - id: black
+        name: black (python formatting)
+        entry: black
+        language: system
+        types: [python]
+        args: ["--check"]
+      - id: prettier
+        name: prettier (JS formatting)
+        entry: prettier
+        language: system
+        types: [javascript, html, css]
+        args: ["--check"]

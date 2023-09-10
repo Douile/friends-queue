@@ -5,15 +5,15 @@ on:
   push:
     branches: ["main"]
     paths:
-      - '**/*.js'
-      - '**/*.html'
-      - '**/*.css'
+      - "**/*.js"
+      - "**/*.html"
+      - "**/*.css"
   pull_request:
     branches: ["main"]
     paths:
-      - '**/*.js'
-      - '**/*.html'
-      - '**/*.css'
+      - "**/*.js"
+      - "**/*.html"
+      - "**/*.css"
   workflow_dispatch:
 
 jobs:
