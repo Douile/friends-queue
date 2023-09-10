@@ -9,10 +9,11 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import unquote, quote
 import html
 from math import floor
-import os
+import os.path
 
+from .cache import make_cache_dirs
 from .video_queue import VideoQueue, VideoQueueItem
-
+from .thumbnail_cache import ThumbnailCache
 
 SRC_DIR = os.path.dirname(__file__)
 
@@ -54,7 +55,7 @@ def seconds_duration(secs: float) -> str:
     return "{:02}:{:02}:{:02}".format(floor(hours), floor(mins), floor(secs))
 
 
-def http_handler(player: mpv.MPV, queue: VideoQueue):
+def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
     """Create a HTTPHandler class with encapsulated player"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
@@ -64,7 +65,9 @@ def http_handler(player: mpv.MPV, queue: VideoQueue):
 
             path = self.path[:i] if i > -1 else self.path
             # 404
-            if path != "/":
+            if ThumbnailCache.is_thumbnail_url(path):
+                return thumbs.handle_request(self, path)
+            elif path != "/":
                 self.send_error(404)
                 self.end_headers()
                 return None
@@ -249,7 +252,9 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
 
         if item.title is not None:
             if item.thumbnail is not None:
-                content += '<img src="{}">'.format(html.escape(item.thumbnail, True))
+                content += '<img src="{}" loading="lazy">'.format(
+                    html.escape(item.thumbnail, True)
+                )
             content += '<span class="title">'
             if item.uploader is not None:
                 content += "{} - ".format(html.escape(item.uploader))
@@ -274,6 +279,8 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
 
 
 def main(debug=False):
+    cache_dirs = make_cache_dirs()
+
     extra_args = {}
     if debug:
         extra_args["log_handler"] = print
@@ -293,12 +300,14 @@ def main(debug=False):
             "format": FORMAT_SPECIFIER,
             "skip_download": True,
             "noplaylist": True,
+            "cache_dir": cache_dirs.ytdl,
         }
     )
 
-    queue = VideoQueue(player, ytdl)
+    thumbnails = ThumbnailCache(cache_dirs.thumbs)
+    queue = VideoQueue(player, ytdl, thumbnails)
 
-    http = HTTPThread(ADDRESS, http_handler(player, queue))
+    http = HTTPThread(ADDRESS, http_handler(player, queue, thumbnails))
     http.start()
 
     try:
@@ -310,6 +319,9 @@ def main(debug=False):
 
     print("Shutting down")
     http.shutdown()
+
+    print("Deleting cache")
+    del cache_dirs
 
 
 if __name__ == "__main__":

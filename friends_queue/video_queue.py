@@ -8,6 +8,8 @@ from urllib.request import urlopen
 from http.client import HTTPResponse
 import base64
 
+from .thumbnail_cache import ThumbnailCache
+
 
 @dataclass
 class VideoQueueItem:
@@ -23,10 +25,13 @@ class VideoQueueItem:
 # TODO: Lock queue
 # TODO: Async ytdl fetch
 class VideoQueue(List[VideoQueueItem]):
-    def __init__(self, player: mpv.MPV, ytdl: yt_dlp.YoutubeDL):
+    def __init__(
+        self, player: mpv.MPV, ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache
+    ):
         super().__init__()
         self._player = player
         self._ytdl = ytdl
+        self._thumbs = thumbnails
 
     def append(self, item: VideoQueueItem):
         assert item is not None
@@ -34,7 +39,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._player.loadfile(item.url, mode="append-play")
 
     def append_url(self, url: str):
-        self.append(fetch_video(self._ytdl, url))
+        self.append(fetch_video(self._ytdl, self._thumbs, url))
 
     def move(self, item: int, to: int):
         assert item >= 0 and item < len(self)
@@ -66,9 +71,12 @@ def choose_thumbnail(thumbnails):
 
 
 class FetchVideoThread(Thread):
-    def __init__(self, ytdl: yt_dlp.YoutubeDL, item: VideoQueueItem):
+    def __init__(
+        self, ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache, item: VideoQueueItem
+    ):
         super().__init__(daemon=True)
         self._ytdl = ytdl
+        self._thumbs = thumbnails
         self._item = item
 
     def run(self):
@@ -83,23 +91,14 @@ class FetchVideoThread(Thread):
         # Fetch video thumbnail (as base64)
         thumbnail = choose_thumbnail(info.get("thumbnails"))
         if thumbnail is not None:
-            res: HTTPResponse = urlopen(thumbnail)
-            if not isinstance(res, HTTPResponse):
-                raise Exception("Expected HTTP response")
-            if res.status != 200:
-                raise Exception("Bad image status code")
-            content_type = res.headers["content-type"]
-            self._item.thumbnail = (
-                "data:"
-                + content_type
-                + ";base64,"
-                + str(base64.b64encode(res.read()), "utf-8")
-            )
+            self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail)
 
 
-def fetch_video(ytdl: yt_dlp.YoutubeDL, url: str) -> VideoQueueItem:
+def fetch_video(
+    ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache, url: str
+) -> VideoQueueItem:
     item = VideoQueueItem(url)
 
-    FetchVideoThread(ytdl, item).start()
+    FetchVideoThread(ytdl, thumbnails, item).start()
 
     return item
