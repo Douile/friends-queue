@@ -208,15 +208,14 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         generate_action_button(wfile, action, action_text)
     wfile.write(b"</form>")
 
-    if player.playlist_pos < 0:
-        return
     # Status
-    wfile.write(b"<p>")
-    if player.pause:
-        wfile.write(b"Paused")
-    else:
-        wfile.write(bytes("Playing {}".format(player.media_title), "utf-8"))
-    wfile.write(b"</p>")
+    if player.playlist_pos > 0:
+        wfile.write(b"<p>")
+        if player.pause:
+            wfile.write(b"Paused")
+        else:
+            wfile.write(bytes("Playing {}".format(player.media_title), "utf-8"))
+        wfile.write(b"</p>")
     # If currently playing show seek bar and volume
     if not player.pause and player.time_pos is not None:
         # Seek bar
