@@ -148,7 +148,7 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(
-                b'<!DOCTYPE HTML>\n<html lang="en"><head><title>Friends Queue</title><meta name="viewport" content="width=device-width,initial-scale=1"/><style>'
+                b'<!DOCTYPE HTML>\n<html lang="en"><head><title>Friends Queue</title><meta name="viewport" content="width=device-width,initial-scale=1"/><meta charset="utf-8"><style>'
             )
             self.wfile.write(STYLE)
             self.wfile.write(b"</style><script>")
@@ -221,7 +221,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         generate_action_button(wfile, "volume_down")
         wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
         generate_action_button(wfile, "volume_up")
-    wfile.write(b"</form>")
+        wfile.write(b"</form>")
     # Playlist
     player_current = player.playlist_pos
     time_before = 0
