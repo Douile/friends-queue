@@ -36,6 +36,6 @@ jobs:
           python-version: "3.11"
           cache: "pip" # caching pip dependencies
       - name: Install formatter
-        run: pip installblack==23.7.0
+        run: pip install black==23.7.0
       - name: Check formatting
         run: black --check friends_queue
