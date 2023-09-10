@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 
-import mpv
-import yt_dlp
-
 import threading
-import sys
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import unquote, quote
 import html
 from math import floor
 import os.path
 
+import mpv
+import yt_dlp
+
 from .cache import make_cache_dirs
-from .video_queue import VideoQueue, VideoQueueItem
+from .video_queue import VideoQueue
 from .thumbnail_cache import ThumbnailCache
 
 SRC_DIR = os.path.dirname(__file__)
@@ -59,15 +58,16 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
     """Create a HTTPHandler class with encapsulated player"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
+        # pylint: disable=invalid-name
         def do_GET(self):
             text = ""
             i = self.path.find("?")
 
             path = self.path[:i] if i > -1 else self.path
-            # 404
             if ThumbnailCache.is_thumbnail_url(path):
                 return thumbs.handle_request(self, path)
-            elif path != "/":
+            if path != "/":
+                # 404
                 self.send_error(404)
                 self.end_headers()
                 return None
@@ -197,12 +197,12 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         ("resume", "⏵︎ Resume"),
     ]
     wfile.write(b'<form class="actions">')
-    for action, text in actions:
-        generate_action_button(wfile, action, text)
+    for action, action_text in actions:
+        generate_action_button(wfile, action, action_text)
     wfile.write(b"</form>")
 
     if player.playlist_pos < 0:
-        return None
+        return
     # Status
     wfile.write(b"<p>")
     if player.pause:

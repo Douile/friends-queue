@@ -16,9 +16,9 @@ class CacheDirs:
 
 
 def __make_cache_dir(base: str, name: str) -> str:
-    dir = os.path.join(base, name)
-    mkdir(dir)
-    return dir
+    directory = os.path.join(base, name)
+    mkdir(directory)
+    return directory
 
 
 def make_cache_dirs(base_dir: str = None):

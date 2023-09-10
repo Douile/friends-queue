@@ -1,18 +1,17 @@
-import mpv
-import yt_dlp
-
 from typing import List
 from dataclasses import dataclass
 from threading import Thread
-from urllib.request import urlopen
-from http.client import HTTPResponse
-import base64
+
+import mpv
+import yt_dlp
 
 from .thumbnail_cache import ThumbnailCache
 
 
 @dataclass
 class VideoQueueItem:
+    """Video Queue item data"""
+
     url: str
     title: str = None
     uploader: str = None
@@ -25,6 +24,8 @@ class VideoQueueItem:
 
 # TODO: Lock queue
 class VideoQueue(List[VideoQueueItem]):
+    """Managed video queue"""
+
     def __init__(
         self, player: mpv.MPV, ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache
     ):
@@ -48,23 +49,23 @@ class VideoQueue(List[VideoQueueItem]):
         """Fetch video URL and asyncronously append to queue"""
         fetch_video(self._ytdl, self._thumbs, self, url)
 
-    def move(self, item: int, to: int):
-        assert item >= 0 and item < len(self)
-        assert to >= 0 and to < len(self)
+    def move(self, item_index: int, new_index: int):
+        assert 0 <= item_index < len(self)
+        assert 0 <= new_index < len(self)
 
-        if item == to:
-            return None
+        if item_index == new_index:
+            return
 
-        item_value = self[item]
-        if item < to:
-            for i in range(item, to):
+        item_value = self[item_index]
+        if item_index < new_index:
+            for i in range(item_index, new_index):
                 self[i] = self[i + 1]
         else:
-            for i in range(to + 1, item):
+            for i in range(new_index + 1, item_index):
                 self[i] = self[i - 1]
-        self[to] = item_value
+        self[new_index] = item_value
 
-        self._player.playlist_move(item, to)
+        self._player.playlist_move(item_index, new_index)
 
 
 def choose_thumbnail(thumbnails):

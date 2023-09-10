@@ -1,8 +1,8 @@
 import os.path
 from dataclasses import dataclass
 from urllib.request import urlopen
-from http.client import HTTPResponse
 import hashlib
+from http.client import HTTPResponse
 from http.server import BaseHTTPRequestHandler
 from collections.abc import MutableMapping
 from io import FileIO
@@ -24,6 +24,8 @@ class ThumbnailItem:
 
 
 class ThumbnailCache:
+    """A cache that manages fetching and storing thumbnails"""
+
     def __init__(self, cache_dir: str):
         """Create a thumbnail cache"""
         self._cache_dir = os.path.abspath(cache_dir)
@@ -46,22 +48,25 @@ class ThumbnailCache:
                 "Thumbnail URL returned content-type that is not an image: "
                 + str(content_type)
             )
-        hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
-        file_path = os.path.join(self._cache_dir, hash)
+        thumb_hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
+        file_path = os.path.join(self._cache_dir, thumb_hash)
         with open(file_path, "wb") as file:
             copyfileobj(res, file, length=content_length)
+        # pylint: disable=consider-using-with
         file = open(file_path, "rb")
         if content_length is None:
             file.seek(0, os.SEEK_END)
             content_length = file.tell()
-        self._cached[hash] = ThumbnailItem(file, content_type, content_length, time())
-        return "." + THUMBNAIL_PREFIX + hash
+        self._cached[thumb_hash] = ThumbnailItem(
+            file, content_type, content_length, time()
+        )
+        return "." + THUMBNAIL_PREFIX + thumb_hash
 
     def handle_request(self, handler: BaseHTTPRequestHandler, path: str):
         """Handle a request, caller must check path is a thumbnail URL prior to calling"""
-        hash = path[len(THUMBNAIL_PREFIX) :]
-        if hash in self._cached:
-            item = self._cached[hash]
+        thumb_hash = path[len(THUMBNAIL_PREFIX) :]
+        if thumb_hash in self._cached:
+            item = self._cached[thumb_hash]
             assert item is not None
 
             item_modified = handler.date_time_string(timestamp=item.timestamp)
@@ -78,7 +83,7 @@ class ThumbnailCache:
                 handler.send_header("Cache-Control", CACHE_CONTROL)
                 handler.send_header("Last-Modified", item_modified)
                 handler.end_headers()
-                return None
+                return
 
             # Send image
             handler.send_response(200)
