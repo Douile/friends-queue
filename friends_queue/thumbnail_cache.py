@@ -36,11 +36,12 @@ class ThumbnailItem:
 class ThumbnailCache:
     """A cache that manages fetching and storing thumbnails"""
 
-    def __init__(self, cache_dir: str):
+    def __init__(self, cache_dir: str, use_sendfile=True):
         """Create a thumbnail cache"""
         self._cache_dir = os.path.abspath(cache_dir)
         assert os.path.isdir(self._cache_dir)
         self._cached: MutableMapping[str, ThumbnailItem] = {}
+        self._use_sendfile = use_sendfile
 
     def cache_thumbnail(self, url: str) -> str:
         """Download an image from URL and return path to fetch from cache"""
@@ -64,6 +65,7 @@ class ThumbnailCache:
                 )
             file_path = os.path.join(self._cache_dir, thumb_hash)
             with open(file_path, "wb") as file:
+                # Don't use sendfile here as res decodes
                 copyfileobj(res, file, length=content_length)
         # pylint: disable=consider-using-with
         file = open(file_path, "rb")
@@ -105,8 +107,11 @@ class ThumbnailCache:
             handler.send_header("Cache-Control", CACHE_CONTROL)
             handler.send_header("Last-Modified", item_modified)
             handler.end_headers()
-            item.file.seek(0)
-            copyfileobj(item.file, handler.wfile, length=item.content_len)
+            if self._use_sendfile:
+                handler.request.sendfile(item.file, offset=0, count=item.content_len)
+            else:
+                item.file.seek(0)
+                copyfileobj(item.file, handler.wfile, length=item.content_len)
         else:
             handler.send_error(404)
 
