@@ -41,7 +41,6 @@ class VideoQueue(List[VideoQueueItem]):
     def append(self, item: VideoQueueItem):
         """Append a new video item to queue and add to mpv playlist"""
         assert item is not None
-        super().append(item)
 
         args = {}
         if item.audio_url is not None:
@@ -50,8 +49,13 @@ class VideoQueue(List[VideoQueueItem]):
             args["force_media_title"] = item.title
         self._player.loadfile(item.video_url or item.url, mode="append-play", **args)
 
+        # Append to self after as player might error
+        super().append(item)
+
     def append_url(self, url: str):
         """Fetch video URL and asyncronously append to queue"""
+        if len(url.strip()) == 0:
+            return  # Early return if no request provided
         _fetch_video(self._ytdl, self._thumbs, self, url)
 
     def move(self, item_index: int, new_index: int):
@@ -76,7 +80,7 @@ class VideoQueue(List[VideoQueueItem]):
     def active_fetches(self) -> Sequence[str]:
         """Get currently active fetches"""
         for i, thread in enumerate(self._active):
-            if not thread.is_in_queue():
+            if not thread.is_in_queue() and thread.is_alive():
                 yield thread.url()
             else:
                 self._active.pop(i)
