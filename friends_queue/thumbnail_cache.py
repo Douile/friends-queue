@@ -42,6 +42,10 @@ class ThumbnailCache:
 
     def cache_thumbnail(self, url: str) -> str:
         """Download an image from URL and return path to fetch from cache"""
+        thumb_hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
+        thumb_path = "." + THUMBNAIL_PREFIX + thumb_hash
+        if thumb_hash in self._cached:
+            return thumb_path
         with urlopen(url) as res:
             if not isinstance(res, HTTPResponse):
                 raise HTTPException("Expected HTTP response")
@@ -56,7 +60,6 @@ class ThumbnailCache:
                     "Thumbnail URL returned content-type that is not an image: "
                     + str(content_type)
                 )
-            thumb_hash = hashlib.sha512(bytes(url, "utf-8")).hexdigest()
             file_path = os.path.join(self._cache_dir, thumb_hash)
             with open(file_path, "wb") as file:
                 copyfileobj(res, file, length=content_length)
@@ -68,7 +71,7 @@ class ThumbnailCache:
         self._cached[thumb_hash] = ThumbnailItem(
             file, content_type, content_length, time()
         )
-        return "." + THUMBNAIL_PREFIX + thumb_hash
+        return thumb_path
 
     def handle_request(self, handler: BaseHTTPRequestHandler, path: str):
         """Handle a request, caller must check path is a thumbnail URL prior to calling"""
