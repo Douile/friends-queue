@@ -45,9 +45,10 @@ body > * {
 }
 .queue {
   counter-reset: section;
+  display: flex;
+  flex-flow: column nowrap;
 }
 .queue-item {
-  cursor: pointer;
   padding: 0.5em;
   background-color: var(--hl);
   display: grid;
@@ -55,8 +56,10 @@ body > * {
   grid-template-areas: "a b c c" "a b d e";
   grid-gap: 0.5em;
   align-items: center;
-  text-decoration: none;
-  color: var(--fg);
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  font-size: large;
 }
 .queue-item::before {
   counter-increment: section;
@@ -86,8 +89,8 @@ body > * {
 .queue-item.loading::before {
   content: " ";
   display: block;
-  width: 35px;
-  height: 35px;
+  width: 1.5em;
+  height: 1.5em;
   margin: 8px;
   border-radius: 50%;
   border: 6px solid #fff;

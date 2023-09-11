@@ -255,7 +255,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     time_after = 0
     after_current = False
 
-    wfile.write(b'<div class="queue">')
+    wfile.write(b'<form class="queue">')
     for i, item in enumerate(queue):
         current = i == player_current
         if current:
@@ -271,7 +271,9 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
         elif item.duration is not None:
             time_before += item.duration
 
-        content = '<a href="?pos={}" class="queue-item'.format(i)
+        content = (
+            '<button type="submit" name="pos" value="{}" class="queue-item'.format(i)
+        )
         if current:
             content += " current"
         content += '">'
@@ -296,7 +298,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
             content += '<span class="link">{0}</span>'.format(html.escape(item.url))
         else:
             content += html.escape(item.url)
-        content += "</a>"
+        content += "</button>"
         wfile.write(bytes(content, "utf-8"))
     # Currently fetching
     for active in queue.active_fetches():
@@ -306,7 +308,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
                 "utf-8",
             )
         )
-    wfile.write(b"</div>")
+    wfile.write(b"</form>")
     wfile.write(
         bytes(
             '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div'.format(
