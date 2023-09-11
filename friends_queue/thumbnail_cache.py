@@ -29,6 +29,8 @@ class ThumbnailItem:
     content_type: str
     content_len: int
     timestamp: float
+    width: int = None
+    height: int = None
 
 
 class ThumbnailCache:

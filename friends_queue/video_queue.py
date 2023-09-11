@@ -86,13 +86,20 @@ class VideoQueue(List[VideoQueueItem]):
                 self._active.pop(i)
 
 
-def _choose_thumbnail(thumbnails):
+@dataclass
+class _ThumbURL:
+    width: int
+    height: int
+    url: str
+
+
+def _choose_thumbnail(thumbnails) -> _ThumbURL:
     if thumbnails is None:
         return None
     for thumb in thumbnails:
         width = thumb.get("width")
         if width is not None and width > 300 and "url" in thumb:
-            return thumb["url"]
+            return _ThumbURL(thumb["width"], thumb["height"], thumb["url"])
     return None
 
 
@@ -157,7 +164,9 @@ class FetchVideoThread(Thread):
         # Fetch video thumbnail (as base64)
         thumbnail = _choose_thumbnail(info.get("thumbnails"))
         if thumbnail is not None:
-            self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail)
+            self._item.thumbnail = self._thumbs.cache_thumbnail(thumbnail.url)
+            self._item.thumbnail_width = thumbnail.width
+            self._item.thumbnail_height = thumbnail.height
 
     def url(self) -> str:
         """Get the URL being fetched"""
