@@ -59,6 +59,8 @@ class VideoQueue(List[VideoQueueItem]):
         """Fetch video URL and asyncronously append to queue"""
         if len(url.strip()) == 0:
             return  # Early return if no request provided
+        if self.has_been_queued(url):
+            return  # Early return if URL already in queue
         _fetch_video(self._ytdl, self._thumbs, self, url)
 
     def move(self, item_index: int, new_index: int):
@@ -79,6 +81,19 @@ class VideoQueue(List[VideoQueueItem]):
         self[new_index] = item_value
 
         self._player.playlist_move(item_index, new_index)
+
+    def has_been_queued(self, url: str):
+        """Check if a URL has already been queued"""
+
+        for item in self:
+            if item.url == url:
+                return True
+
+        for fetch_url in self.active_fetches():
+            if fetch_url == url:
+                return True
+
+        return False
 
     def active_fetches(self) -> Sequence[str]:
         """Get currently active fetches"""
