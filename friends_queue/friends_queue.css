@@ -97,6 +97,14 @@ body > * {
   border-color: #fff transparent #fff transparent;
   animation: lds-dual-ring 1.2s linear infinite;
 }
+.queue-item.error::before {
+  content: "⚠";
+  color: #f00;
+  font-size: large;
+}
+.queue-item.error {
+  border: 1px solid #f00;
+}
 @keyframes lds-dual-ring {
   from {
     transform: rotate(0deg);

@@ -308,6 +308,16 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
                 "utf-8",
             )
         )
+    # Recent errors
+    for error in queue.recent_errors():
+        wfile.write(
+            bytes(
+                '<div class="queue-item error">{}</div>'.format(
+                    html.escape(str(error))
+                ),
+                "utf-8",
+            )
+        )
     wfile.write(b"</form>")
     wfile.write(
         bytes(

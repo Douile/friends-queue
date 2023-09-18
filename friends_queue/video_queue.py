@@ -39,6 +39,7 @@ class VideoQueue(List[VideoQueueItem]):
         self._ytdl = ytdl
         self._thumbs = thumbnails
         self._active: list[FetchVideoThread] = []
+        self._errors: list[Exception] = []
 
     def append(self, item: VideoQueueItem):
         """Append a new video item to queue and add to mpv playlist"""
@@ -106,7 +107,15 @@ class VideoQueue(List[VideoQueueItem]):
             ):
                 yield thread.url()
             else:
-                self._active.pop(i)
+                thread = self._active.pop(i)
+                error = thread.get_error()
+                if error is not None:
+                    self._errors.append(error)
+
+    def recent_errors(self) -> Sequence[Exception]:
+        """Get recent fetch exceptions"""
+        while len(self._errors) > 0:
+            yield self._errors.pop()
 
 
 @dataclass
