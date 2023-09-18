@@ -1,9 +1,11 @@
 """Manage the queue of videos"""
 
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 from threading import Thread
 from collections.abc import Sequence
+import traceback
+import sys
 
 import mpv
 import yt_dlp
@@ -61,7 +63,8 @@ class VideoQueue(List[VideoQueueItem]):
             return  # Early return if no request provided
         if self.has_been_queued(url):
             return  # Early return if URL already in queue
-        _fetch_video(self._ytdl, self._thumbs, self, url)
+        thread = _fetch_video(self._ytdl, self._thumbs, self, url)
+        self._active.append(thread)
 
     def move(self, item_index: int, new_index: int):
         """Move queue items"""
@@ -98,7 +101,9 @@ class VideoQueue(List[VideoQueueItem]):
     def active_fetches(self) -> Sequence[str]:
         """Get currently active fetches"""
         for i, thread in enumerate(self._active):
-            if not thread.is_in_queue() and thread.is_alive():
+            if not thread.has_started() or (
+                not thread.is_in_queue() and thread.is_alive()
+            ):
                 yield thread.url()
             else:
                 self._active.pop(i)
@@ -152,9 +157,18 @@ class FetchVideoThread(Thread):
         self._queue = queue
         self._item = item
         self._is_in_queue = False
+        self._has_started = False
+        self._error = None
 
     def run(self):
-        self._queue._active.append(self)
+        self._has_started = True
+        try:
+            self._do_fetch()
+        except:
+            self._error = sys.exception()
+            traceback.print_exception(self._error)
+
+    def _do_fetch(self):
         # Fetch video info
         info = self._ytdl.extract_info(self._item.url, download=False)
 
@@ -194,12 +208,21 @@ class FetchVideoThread(Thread):
         """Whether enough info has been fetched to add item to video queue"""
         return self._is_in_queue
 
+    def has_started(self) -> bool:
+        """Whether the fetch has been started"""
+        return self._has_started
+
+    def get_error(self) -> Optional[Exception]:
+        """Get the error this thread encountered"""
+        return self._error
+
 
 def _fetch_video(
     ytdl: yt_dlp.YoutubeDL, thumbnails: ThumbnailCache, queue: VideoQueue, url: str
-) -> VideoQueueItem:
+) -> FetchVideoThread:
     item = VideoQueueItem(url)
 
-    FetchVideoThread(ytdl, thumbnails, queue, item).start()
+    thread = FetchVideoThread(ytdl, thumbnails, queue, item)
+    thread.start()
 
-    return item
+    return thread
