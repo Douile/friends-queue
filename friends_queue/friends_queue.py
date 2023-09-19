@@ -255,8 +255,14 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     time_before = 0
     time_after = 0
     after_current = False
+    skip_before = player_current - 1
 
-    wfile.write(b'<form class="queue">')
+    wfile.write(
+        bytes(
+            f'<form class="queue" style="counter-reset: section {max(skip_before, 0)}">',
+            "utf-8",
+        )
+    )
     for i, item in enumerate(queue):
         current = i == player_current
         if current:
@@ -271,6 +277,10 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
             time_after += item.duration
         elif item.duration is not None:
             time_before += item.duration
+
+        # Only show one item before current item
+        if not after_current and i < skip_before:
+            continue
 
         content = (
             '<button type="submit" name="pos" value="{}" class="queue-item'.format(i)
