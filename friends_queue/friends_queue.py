@@ -18,6 +18,7 @@ from .actions import ACTIONS
 from .cache import make_cache_dirs
 from .video_queue import VideoQueue
 from .thumbnail_cache import ThumbnailCache
+from .static_files import StaticFiles
 from .utils import parse_search_query
 
 SRC_DIR = os.path.dirname(__file__)
@@ -71,7 +72,9 @@ class RequestState:
     text: str = ""
 
 
-def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
+def http_handler(
+    player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache, static: StaticFiles
+):
     """Create a HTTPHandler class with encapsulated player"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
@@ -87,6 +90,9 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
             path = self.path[:i] if i > -1 else self.path
             if ThumbnailCache.is_thumbnail_url(path):
                 thumbs.handle_request(self, path)
+                return
+            if StaticFiles.is_static_url(path):
+                static.handle_request(self, path)
                 return
             if path != "/":
                 # 404
@@ -117,13 +123,10 @@ def http_handler(player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache):
                 + b"<title>Friends Queue</title>"
                 + b'<meta name="viewport" content="width=device-width,initial-scale=1">'
                 + b'<meta charset="utf-8">'
+                + b'<link rel="stylesheet" href="./static/friends_queue.css">'
+                + b'<script async src="./static/friends_queue.js"></script>'
+                + b"</head><body>"
             )
-            # Stylesheet and javascript
-            self.wfile.write(b"<style>")
-            self.wfile.write(STYLE)
-            self.wfile.write(b"</style><script>")
-            self.wfile.write(JS)
-            self.wfile.write(b"</script></head><body>")
             # Page content
             generate_page(self.wfile, player, queue, state.text)
             self.wfile.write(b"</body>")
@@ -369,6 +372,9 @@ def main(debug=False, search=True, format_specifier=None, host=None, port=None):
 
     ytdl = yt_dlp.YoutubeDL(yt_args)
 
+    static = StaticFiles(
+        os.path.dirname(__file__), ["friends_queue.css", "friends_queue.js"]
+    )
     thumbnails = ThumbnailCache(cache_dirs.thumbs)
     queue = VideoQueue(player, ytdl, thumbnails)
 
@@ -378,7 +384,7 @@ def main(debug=False, search=True, format_specifier=None, host=None, port=None):
     if port is not None:
         listen_address = (listen_address[0], port)
 
-    http = HTTPThread(listen_address, http_handler(player, queue, thumbnails))
+    http = HTTPThread(listen_address, http_handler(player, queue, thumbnails, static))
     http.start()
 
     try:
