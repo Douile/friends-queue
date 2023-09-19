@@ -329,7 +329,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     )
 
 
-def main(debug=False, search=True):
+def main(debug=False, search=True, format_specifier=None, host=None, port=None):
     """Main func"""
     cache_dirs = make_cache_dirs()
 
@@ -340,7 +340,7 @@ def main(debug=False, search=True):
     extra_args["script_opts"] = "ytdl_hook-cachedir=" + cache_dirs.ytdl
     player = mpv.MPV(
         ytdl=True,
-        ytdl_format=FORMAT_SPECIFIER,
+        ytdl_format=format_specifier or FORMAT_SPECIFIER,
         input_default_bindings=True,
         input_vo_keyboard=True,
         osc=True,
@@ -349,7 +349,7 @@ def main(debug=False, search=True):
     )
 
     yt_args = {
-        "format": FORMAT_SPECIFIER,
+        "format": format_specifier or FORMAT_SPECIFIER,
         "skip_download": True,
         "cachedir": cache_dirs.ytdl,
     }
@@ -361,7 +361,13 @@ def main(debug=False, search=True):
     thumbnails = ThumbnailCache(cache_dirs.thumbs)
     queue = VideoQueue(player, ytdl, thumbnails)
 
-    http = HTTPThread(ADDRESS, http_handler(player, queue, thumbnails))
+    listen_address = ADDRESS
+    if host is not None:
+        listen_address = (host, listen_address[1])
+    if port is not None:
+        listen_address = (listen_address[0], port)
+
+    http = HTTPThread(listen_address, http_handler(player, queue, thumbnails))
     http.start()
 
     try:
