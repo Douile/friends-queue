@@ -335,7 +335,7 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     wfile.write(b"</form>")
     wfile.write(
         bytes(
-            '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div'.format(
+            '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div>'.format(
                 seconds_duration(time_before), seconds_duration(time_after)
             ),
             "utf-8",
