@@ -13,6 +13,10 @@ import yt_dlp
 from .thumbnail_cache import ThumbnailCache
 
 
+class VideoNotFoundException(Exception):
+    """Thrown when a video was not found"""
+
+
 @dataclass
 class VideoQueueItem:
     """Video Queue item data"""
@@ -173,6 +177,7 @@ class FetchVideoThread(Thread):
         self._has_started = True
         try:
             self._do_fetch()
+        # pylint: disable=bare-except
         except:
             self._error = sys.exception()
             traceback.print_exception(self._error)
@@ -182,7 +187,9 @@ class FetchVideoThread(Thread):
         info = self._ytdl.extract_info(self._item.url, download=False)
 
         if info is None:
-            return  # TODO: handle error
+            raise VideoNotFoundException(
+                f'Unable to find a video that matches "{self._item.url}"'
+            )
 
         if info.get("_type") == "playlist":
             info = info.get("entries")[0]
