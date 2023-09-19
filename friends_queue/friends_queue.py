@@ -9,6 +9,7 @@ from math import floor
 import os.path
 from collections.abc import Mapping
 from dataclasses import dataclass
+import traceback
 
 import mpv
 import yt_dlp
@@ -373,7 +374,7 @@ def main(debug=False, search=True, format_specifier=None, host=None, port=None):
     try:
         player.wait_for_shutdown()
     except Exception as error:  # pylint: disable=broad-exception-caught
-        print(error)
+        traceback.print_exception(error)
 
     del player
 
