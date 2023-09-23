@@ -418,9 +418,10 @@ def main(config: Config = Config()):
     http.start()
 
     try:
-        player.wait_for_shutdown()
-    except Exception as error:  # pylint: disable=broad-exception-caught
-        traceback.print_exception(error)
+        while input("") != "q":
+            pass
+    except KeyboardInterrupt:
+        pass
 
     del player
 
