@@ -30,10 +30,36 @@ FORMAT_SPECIFIER = (
     "bv[height<=720][vbr<2000][fps<=30]+ba[abr<=62]/b[height<=720][fps<=30]"
 )
 
-with open(os.path.join(SRC_DIR, "friends_queue.css"), "rb") as f:
-    STYLE = f.read()
-with open(os.path.join(SRC_DIR, "friends_queue.js"), "rb") as f:
-    JS = f.read()
+
+@dataclass
+class Config:
+    """Config options for the app
+
+    Attributes:
+        debug               Enable MPV debug messages
+        search              Enable yt-dlp search
+        format_specifier    Override the yt-dl FORMAT SPECIFIER
+        host                Set the IP address to listen on
+        port                Set the port to listen on
+    """
+
+    debug: bool = False
+    search: bool = True
+    format_specifier: str = None
+    host: str = None
+    port: int = None
+
+
+@dataclass
+class _State:
+    """App state"""
+
+    config: Config
+    player: mpv.MPV
+    ytdl: yt_dlp.YoutubeDL
+    static: StaticFiles
+    thumbnails: ThumbnailCache
+    queue: VideoQueue
 
 
 class HTTPThread(threading.Thread):
@@ -72,10 +98,8 @@ class RequestState:
     text: str = ""
 
 
-def http_handler(
-    player: mpv.MPV, queue: VideoQueue, thumbs: ThumbnailCache, static: StaticFiles
-):
-    """Create a HTTPHandler class with encapsulated player"""
+def http_handler(app: _State):
+    """Create a HTTPHandler class with encapsulated state"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
         """Custom HTTP request handler"""
@@ -89,10 +113,10 @@ def http_handler(
 
             path = self.path[:i] if i > -1 else self.path
             if ThumbnailCache.is_thumbnail_url(path):
-                thumbs.handle_request(self, path)
+                app.thumbnails.handle_request(self, path)
                 return
             if StaticFiles.is_static_url(path):
-                static.handle_request(self, path)
+                app.static.handle_request(self, path)
                 return
             if path != "/":
                 # 404
@@ -103,7 +127,7 @@ def http_handler(
             if i > -1:
                 query = self.path[i + 1 :]
                 state.options = parse_search_query(query)
-                handle_options(state, player, queue)
+                handle_options(state, app.player, app.queue)
                 if state.redirect:
                     self.send_response(302)
                     path = self.path[:i]
@@ -128,7 +152,7 @@ def http_handler(
                 + b"</head><body>"
             )
             # Page content
-            generate_page(self.wfile, player, queue, state.text)
+            generate_page(self.wfile, app.player, app.queue, state.text)
             self.wfile.write(b"</body>")
 
     return HTTPHandler
@@ -343,18 +367,21 @@ def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
     )
 
 
-def main(debug=False, search=True, format_specifier=None, host=None, port=None):
+def main(config: Config = Config()):
     """Main func"""
+
+    assert isinstance(config, Config)
+
     cache_dirs = make_cache_dirs()
 
     extra_args = {}
-    if debug:
+    if config.debug:
         extra_args["log_handler"] = print
         extra_args["loglevel"] = "debug"
     extra_args["script_opts"] = "ytdl_hook-cachedir=" + cache_dirs.ytdl
     player = mpv.MPV(
         ytdl=True,
-        ytdl_format=format_specifier or FORMAT_SPECIFIER,
+        ytdl_format=config.format_specifier or FORMAT_SPECIFIER,
         input_default_bindings=True,
         input_vo_keyboard=True,
         osc=True,
@@ -363,11 +390,11 @@ def main(debug=False, search=True, format_specifier=None, host=None, port=None):
     )
 
     yt_args = {
-        "format": format_specifier or FORMAT_SPECIFIER,
+        "format": config.format_specifier or FORMAT_SPECIFIER,
         "skip_download": True,
         "cachedir": cache_dirs.ytdl,
     }
-    if search:
+    if config.search:
         yt_args["default_search"] = "auto"
 
     ytdl = yt_dlp.YoutubeDL(yt_args)
@@ -379,12 +406,15 @@ def main(debug=False, search=True, format_specifier=None, host=None, port=None):
     queue = VideoQueue(player, ytdl, thumbnails)
 
     listen_address = ADDRESS
-    if host is not None:
-        listen_address = (host, listen_address[1])
-    if port is not None:
-        listen_address = (listen_address[0], port)
+    if config.host is not None:
+        listen_address = (config.host, listen_address[1])
+    if config.port is not None:
+        listen_address = (listen_address[0], config.port)
 
-    http = HTTPThread(listen_address, http_handler(player, queue, thumbnails, static))
+    http = HTTPThread(
+        listen_address,
+        http_handler(_State(config, player, ytdl, static, thumbnails, queue)),
+    )
     http.start()
 
     try:

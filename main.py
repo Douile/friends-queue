@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from friends_queue.friends_queue import main
+from friends_queue.friends_queue import Config, main
 
 import argparse
 
@@ -65,9 +65,11 @@ if __name__ == "__main__":
         print(f"Using format string: {format_str}")
 
     main(
-        debug=args.debug,
-        search=not args.no_search,
-        format_specifier=format_str,
-        host=args.listen,
-        port=args.port,
+        Config(
+            debug=args.debug,
+            search=not args.no_search,
+            format_specifier=format_str,
+            host=args.listen,
+            port=args.port,
+        )
     )
