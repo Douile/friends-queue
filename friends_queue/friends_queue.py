@@ -113,7 +113,7 @@ def http_handler(app: State):
                 + b"</head><body>"
             )
             # Page content
-            generate_page(self.wfile, app, state.text)
+            generate_page(self.wfile, app, state)
             self.wfile.write(b"</body></html>")
 
     return HTTPHandler
@@ -151,6 +151,8 @@ def handle_options(state: RequestState, player: mpv.MPV, queue: VideoQueue):
         new_pos = int(opts["pos"])
         if player.playlist_pos != new_pos:
             player.playlist_pos = new_pos
+    if "show_skipped" in opts:
+        state.show_skipped_items = opts["show_skipped"] == "1"
 
 
 def main(config: Config = Config()):

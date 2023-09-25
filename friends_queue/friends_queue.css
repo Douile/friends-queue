@@ -48,6 +48,9 @@ body > * {
   display: flex;
   flex-flow: column nowrap;
 }
+.top-button {
+  border-radius: var(--rad) var(--rad) 0 0;
+}
 .queue-item {
   padding: 0.5em;
   background-color: var(--hl);
@@ -119,7 +122,7 @@ button {
   color: var(--fg);
   background-color: var(--bg);
   border: 1px solid var(--fg);
-  border-radius: 5px;
+  border-radius: var(--rad);
 }
 input[type="submit"],
 button {
@@ -130,5 +133,6 @@ button {
   --bg: #1e1e1e;
   --hl: #323232;
   --fg: #fff;
+  --rad: 5px;
   font-family: Segoi;
 }

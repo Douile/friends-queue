@@ -3,7 +3,7 @@
 from io import BufferedIOBase
 import html
 
-from .types import State
+from .types import RequestState, State
 from .utils import seconds_duration
 from .video_queue import VideoQueueItem
 
@@ -183,10 +183,14 @@ def generate_page_queue_items_errors(wfile: BufferedIOBase, state: State):
         )
 
 
-def generate_page_queue(wfile: BufferedIOBase, state: State) -> (int, int):
+def generate_page_queue(
+    wfile: BufferedIOBase, state: State, req: RequestState
+) -> (int, int):
     """Generate HTML for current queue items"""
     player_current = state.player.playlist_pos
     skip_before = player_current - 1
+    if req.show_skipped_items:
+        skip_before = -1
 
     wfile.write(
         bytes(
@@ -194,7 +198,16 @@ def generate_page_queue(wfile: BufferedIOBase, state: State) -> (int, int):
             "utf-8",
         )
     )
-    # TODO: If skipping add button to show previous
+    # Generate a button to show skipped items
+    if skip_before > 0:
+        wfile.write(
+            b'<button class="top-button" type="submit" name="show_skipped" value="1">Show previous</button>'
+        )
+    elif req.show_skipped_items:
+        wfile.write(
+            b'<button class="top-button" type="submit" name="show_skipped" value="0">Hide previous</button>'
+        )
+
     time_before, time_after = generate_page_queue_items_active(
         wfile, state, player_current, skip_before
     )
@@ -222,11 +235,11 @@ def generate_page_watch_times(wfile: BufferedIOBase, time_before: int, time_afte
     )
 
 
-def generate_page(wfile: BufferedIOBase, state: State, text: str):
+def generate_page(wfile: BufferedIOBase, state: State, req: RequestState):
     """Generate the body of a page"""
-    if len(text) > 0:
+    if len(req.text) > 0:
         wfile.write(
-            bytes("<p>{}</p>".format(html.escape(text)), "utf-8")
+            bytes("<p>{}</p>".format(html.escape(req.text)), "utf-8")
         )  # Yes this is XSS
 
     generate_page_actions(wfile)
@@ -247,6 +260,6 @@ def generate_page(wfile: BufferedIOBase, state: State, text: str):
         generate_page_volume_slider(wfile, state)
 
     # Playlist
-    time_before, time_after = generate_page_queue(wfile, state)
+    time_before, time_after = generate_page_queue(wfile, state, req)
 
     generate_page_watch_times(wfile, time_before, time_after)

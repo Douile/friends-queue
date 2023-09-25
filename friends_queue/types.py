@@ -52,3 +52,4 @@ class RequestState:
     redirect: bool = False
     location_extra: str = "?"
     text: str = ""
+    show_skipped_items: bool = False
