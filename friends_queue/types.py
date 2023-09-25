@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from collections.abc import Mapping
+from threading import Condition
 
 import mpv
 import yt_dlp
@@ -40,6 +41,7 @@ class State:
     static: StaticFiles
     thumbnails: ThumbnailCache
     queue: VideoQueue
+    close_condition: Condition
 
 
 @dataclass

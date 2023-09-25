@@ -31,5 +31,6 @@ ACTIONS: Mapping[str, Callable[[MPV], None]] = {
     "resume": _resume,
     "volume_up": _volume_up,
     "volume_down": _volume_down,
+    # TODO: Make use of state close condition
     "quit": lambda player: player.quit(0),
 }

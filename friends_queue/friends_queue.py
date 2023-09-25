@@ -45,6 +45,20 @@ class HTTPThread(threading.Thread):
         self.httpd.shutdown()
 
 
+class PlayerThread(threading.Thread):
+    """Thread that waits for player to exit"""
+
+    def __init__(self, state: State):
+        super().__init__()
+        self._state = state
+
+    def run(self):
+        self._state.player.wait_for_shutdown()
+
+        with self._state.close_condition:
+            self._state.close_condition.notify_all()
+
+
 def http_handler(app: State):
     """Create a HTTPHandler class with encapsulated state"""
 
@@ -144,6 +158,8 @@ def main(config: Config = Config()):
 
     assert isinstance(config, Config)
 
+    close_condition = threading.Condition()
+
     cache_dirs = make_cache_dirs()
 
     extra_args = {}
@@ -177,6 +193,8 @@ def main(config: Config = Config()):
     thumbnails = ThumbnailCache(cache_dirs.thumbs)
     queue = VideoQueue(player, ytdl, thumbnails)
 
+    state = State(config, player, ytdl, static, thumbnails, queue, close_condition)
+
     listen_address = ADDRESS
     if config.host is not None:
         listen_address = (config.host, listen_address[1])
@@ -185,15 +203,17 @@ def main(config: Config = Config()):
 
     http = HTTPThread(
         listen_address,
-        http_handler(State(config, player, ytdl, static, thumbnails, queue)),
+        http_handler(state),
     )
     http.start()
 
-    try:
-        while input("") != "q":
+    PlayerThread(state).start()
+
+    with close_condition:
+        try:
+            close_condition.wait()
+        except KeyboardInterrupt:
             pass
-    except KeyboardInterrupt:
-        pass
 
     del player
 
