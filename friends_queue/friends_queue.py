@@ -114,7 +114,7 @@ def http_handler(app: State):
             )
             # Page content
             generate_page(self.wfile, app, state.text)
-            self.wfile.write(b"</body>")
+            self.wfile.write(b"</body></html>")
 
     return HTTPHandler
 
