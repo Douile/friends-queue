@@ -4,21 +4,18 @@
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import unquote, quote
-import html
-from math import floor
 import os.path
-from collections.abc import Mapping
-from dataclasses import dataclass
-import traceback
 
 import mpv
 import yt_dlp
 
 from .actions import ACTIONS
 from .cache import make_cache_dirs
-from .video_queue import VideoQueue
-from .thumbnail_cache import ThumbnailCache
+from .generate import generate_page
 from .static_files import StaticFiles
+from .thumbnail_cache import ThumbnailCache
+from .types import Config, RequestState, State
+from .video_queue import VideoQueue
 from .utils import parse_search_query
 
 SRC_DIR = os.path.dirname(__file__)
@@ -29,37 +26,6 @@ ADDRESS = ("0.0.0.0", 8000)
 FORMAT_SPECIFIER = (
     "bv[height<=720][vbr<2000][fps<=30]+ba[abr<=62]/b[height<=720][fps<=30]"
 )
-
-
-@dataclass
-class Config:
-    """Config options for the app
-
-    Attributes:
-        debug               Enable MPV debug messages
-        search              Enable yt-dlp search
-        format_specifier    Override the yt-dl FORMAT SPECIFIER
-        host                Set the IP address to listen on
-        port                Set the port to listen on
-    """
-
-    debug: bool = False
-    search: bool = True
-    format_specifier: str = None
-    host: str = None
-    port: int = None
-
-
-@dataclass
-class _State:
-    """App state"""
-
-    config: Config
-    player: mpv.MPV
-    ytdl: yt_dlp.YoutubeDL
-    static: StaticFiles
-    thumbnails: ThumbnailCache
-    queue: VideoQueue
 
 
 class HTTPThread(threading.Thread):
@@ -79,26 +45,7 @@ class HTTPThread(threading.Thread):
         self.httpd.shutdown()
 
 
-def seconds_duration(secs: float) -> str:
-    """Convert time in seconds to duration of hh:mm:ss"""
-    if secs is None:
-        return ""
-    hours, remains = divmod(secs, 3600)
-    mins, secs = divmod(remains, 60)
-    return f"{floor(hours):02}:{floor(mins):02}:{floor(secs):02}"
-
-
-@dataclass
-class RequestState:
-    """Active request state"""
-
-    options: Mapping[str, str] = None
-    redirect: bool = False
-    location_extra: str = "?"
-    text: str = ""
-
-
-def http_handler(app: _State):
+def http_handler(app: State):
     """Create a HTTPHandler class with encapsulated state"""
 
     class HTTPHandler(BaseHTTPRequestHandler):
@@ -152,7 +99,7 @@ def http_handler(app: _State):
                 + b"</head><body>"
             )
             # Page content
-            generate_page(self.wfile, app.player, app.queue, state.text)
+            generate_page(self.wfile, app, state.text)
             self.wfile.write(b"</body>")
 
     return HTTPHandler
@@ -190,181 +137,6 @@ def handle_options(state: RequestState, player: mpv.MPV, queue: VideoQueue):
         new_pos = int(opts["pos"])
         if player.playlist_pos != new_pos:
             player.playlist_pos = new_pos
-
-
-def generate_action_button(wfile, action: str, text: str = None, extra: str = None):
-    """Generate a button that can be clicked to trigger an action"""
-    return wfile.write(
-        bytes(
-            '<button {} type="submit" name="a" value="{}">{}</button>'.format(
-                extra or "",
-                html.escape(action, quote=True),
-                html.escape(text or action),
-            ),
-            "utf-8",
-        )
-    )
-
-
-def generate_page(wfile, player: mpv.MPV, queue: VideoQueue, text: str):
-    """Generate the body of a page"""
-    # TODO: Separate into smaller functions
-    # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-
-    if len(text) > 0:
-        wfile.write(
-            bytes("<p>{}</p>".format(html.escape(text)), "utf-8")
-        )  # Yes this is XSS
-    # Add to queue
-    wfile.write(b'<form id="a"></form><form class="grid link">')
-    generate_action_button(wfile, "quit", "Quit", "form=a")
-    wfile.write(b'<input type=text name=link placeholder="Play link">')
-    generate_action_button(wfile, "play", "Play")
-    wfile.write(b"</form>")
-    # Actions
-    actions = [
-        ("info", "Info"),
-        ("prev", "⏮︎ Previous"),
-        ("skip", "⏭︎ Next"),
-        ("seek_backward", "⏪︎Seek -10s"),
-        ("seek_forward", " ⏩︎Seek +10s"),
-        ("pause", "⏸︎ Pause"),
-        ("resume", "⏵︎ Resume"),
-    ]
-    wfile.write(b'<form class="actions">')
-    for action, action_text in actions:
-        generate_action_button(wfile, action, action_text)
-    wfile.write(b"</form>")
-
-    # Status
-    if player.playlist_pos >= 0:
-        wfile.write(b"<p>")
-        if player.pause:
-            wfile.write(b"Paused")
-        else:
-            wfile.write(bytes("Playing {}".format(player.media_title[:40]), "utf-8"))
-        wfile.write(b"</p>")
-    # If currently playing show seek bar and volume
-    if not player.pause and player.time_pos is not None:
-        # Seek bar
-        if player.seekable:
-            wfile.write(b'<form class="grid seek-bar">')
-            wfile.write(
-                bytes(
-                    "<span>{}</span>".format(seconds_duration(player.time_pos)), "utf-8"
-                )
-            )
-            wfile.write(
-                bytes(
-                    '<input name="seek" type="range" onchange="this.form.submit()" oninput="updateSeekTimes(this)" data-duration="{}" value="{}">'.format(
-                        player.duration,
-                        player.percent_pos,
-                    ),
-                    "utf-8",
-                )
-            )
-            wfile.write(
-                bytes(
-                    "<span>{}</span>".format(seconds_duration(player.time_remaining)),
-                    "utf-8",
-                )
-            )
-            wfile.write(b"</form>")
-    # Volume
-    if player.volume is not None:
-        wfile.write(b'<form class="grid volume">')
-        generate_action_button(wfile, "volume_down", "Decrease Volume")
-        wfile.write(bytes("<span>{:.0f}</span>".format(player.volume), "utf-8"))
-        generate_action_button(wfile, "volume_up", "Increase Volume")
-        wfile.write(b"</form>")
-    # Playlist
-    player_current = player.playlist_pos
-    time_before = 0
-    time_after = 0
-    after_current = False
-    skip_before = player_current - 1
-
-    wfile.write(
-        bytes(
-            f'<form class="queue" style="counter-reset: section {max(skip_before, 0)}">',
-            "utf-8",
-        )
-    )
-    for i, item in enumerate(queue):
-        current = i == player_current
-        if current:
-            after_current = True
-            pos = player.time_pos
-            if pos is not None:
-                time_before += pos
-                time_after += player.time_remaining
-            elif item.duration is not None:
-                time_after += item.duration
-        elif after_current and item.duration is not None:
-            time_after += item.duration
-        elif item.duration is not None:
-            time_before += item.duration
-
-        # Only show one item before current item
-        if not after_current and i < skip_before:
-            continue
-
-        content = (
-            '<button type="submit" name="pos" value="{}" class="queue-item'.format(i)
-        )
-        if current:
-            content += " current"
-        content += '">'
-
-        if item.title is not None:
-            if item.thumbnail is not None:
-                content += '<img src="{}"'.format(html.escape(item.thumbnail, True))
-                if item.thumbnail_height is not None:
-                    height = html.escape(str(item.thumbnail_height), True)
-                    content += f' height="{height}"'
-                if item.thumbnail_width is not None:
-                    width = html.escape(str(item.thumbnail_width), True)
-                    content += f' width="{width}"'
-                content += ">"
-            content += '<span class="title">'
-            if item.uploader is not None:
-                content += "{} - ".format(html.escape(item.uploader))
-            content += "{}</span>".format(html.escape(item.title))
-            content += '<span class="duration">{}</span>'.format(
-                html.escape(item.duration_str)
-            )
-            content += '<span class="link">{0}</span>'.format(html.escape(item.url))
-        else:
-            content += html.escape(item.url)
-        content += "</button>"
-        wfile.write(bytes(content, "utf-8"))
-    # Currently fetching
-    for active in queue.active_fetches():
-        wfile.write(
-            bytes(
-                '<div class="queue-item loading">{}</div>'.format(html.escape(active)),
-                "utf-8",
-            )
-        )
-    # Recent errors
-    for error in queue.recent_errors():
-        wfile.write(
-            bytes(
-                '<div class="queue-item error">{}</div>'.format(
-                    html.escape(str(error))
-                ),
-                "utf-8",
-            )
-        )
-    wfile.write(b"</form>")
-    wfile.write(
-        bytes(
-            '<div class="timings"><span>Watched: {}</span><span>Remaining: {}</span></div>'.format(
-                seconds_duration(time_before), seconds_duration(time_after)
-            ),
-            "utf-8",
-        )
-    )
 
 
 def main(config: Config = Config()):
@@ -413,7 +185,7 @@ def main(config: Config = Config()):
 
     http = HTTPThread(
         listen_address,
-        http_handler(_State(config, player, ytdl, static, thumbnails, queue)),
+        http_handler(State(config, player, ytdl, static, thumbnails, queue)),
     )
     http.start()
 
