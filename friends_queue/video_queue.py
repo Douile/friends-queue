@@ -54,9 +54,7 @@ class VideoQueue(List[VideoQueueItem]):
         # [1]: https://github.com/mpv-player/mpv/blob/8536aaac3c2c22b77a596d0645ac99be20c0186a/player/lua/ytdl_hook.lua#L545
         if item.audio_url is not None:
             args["audio_file"] = item.audio_url
-        if item.title is not None:
-            # Title is restricted to certain characters
-            args["force_media_title"] = item.title.replace("#", "")
+
         self._player.loadfile(item.video_url or item.url, mode="append-play", **args)
 
         # Append to self after as player might error
