@@ -146,6 +146,9 @@ def handle_options(state: RequestState, player: mpv.MPV, queue: VideoQueue):
     if "seek" in opts:
         state.redirect = True
         player.seek(opts["seek"], "absolute-percent+keyframes")
+    if "time" in opts:
+        state.redirect = True
+        player.seek(opts["time"], "absolute+keyframes")
     if "pos" in opts:
         state.redirect = True
         new_pos = int(opts["pos"])

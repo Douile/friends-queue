@@ -31,6 +31,9 @@ body > * {
   margin: 0.5em;
   flex-grow: 1;
 }
+.skip-to {
+  grid-template-columns: 1fr auto;
+}
 .seek-bar {
   grid-template-columns: auto 1fr auto;
   align-items: center;

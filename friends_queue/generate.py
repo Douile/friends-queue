@@ -58,6 +58,16 @@ def generate_page_player_status(wfile: BufferedIOBase, state: State):
     wfile.write(b"</p>")
 
 
+def generate_goto_time(wfile: BufferedIOBase):
+    """Generate an input for time to go to"""
+    wfile.write(b'<form class="grid skip-to">')
+    wfile.write(
+        b'<input type=text name=time required pattern="\\d*(:\\d+)*" placeholder="00:00">'
+    )
+    wfile.write(b"<button type=submit>Skip to</button>")
+    wfile.write(b"</form>")
+
+
 def generate_page_seek_bar(wfile: BufferedIOBase, state: State):
     """Generate HTML for seek bar"""
     wfile.write(b'<form class="grid seek-bar">')
@@ -253,6 +263,7 @@ def generate_page(wfile: BufferedIOBase, state: State, req: RequestState):
         and state.player.time_pos is not None
         and state.player.seekable
     ):
+        generate_goto_time(wfile)
         generate_page_seek_bar(wfile, state)
 
     # Volume
