@@ -198,8 +198,10 @@ class FetchVideoThread(Thread):
         self._item.duration_str = info.get("duration_string")
 
         video, audio = _get_stream_urls(info)
-        self._item.video_url = video.get("url")
-        self._item.audio_url = audio.get("url")
+        if video is not None:
+            self._item.video_url = video.get("url")
+        if audio is not None:
+            self._item.audio_url = audio.get("url")
         # TODO: Add other metadata added by ytdl_hook e.g. subtitles, chapters, bitrate
 
         # Append before fetching thumbnail as that requires another request and is not required to
