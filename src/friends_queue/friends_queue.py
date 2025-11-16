@@ -186,6 +186,7 @@ def main(config: Config = Config()):
         "format": config.format_specifier or FORMAT_SPECIFIER,
         "skip_download": True,
         "cachedir": cache_dirs.ytdl,
+        "remote_components": [],
     }
     if config.search:
         yt_args["default_search"] = "auto"

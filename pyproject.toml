@@ -1,0 +1,29 @@
+[project]
+name = "friends-queue"
+version = "0.1.1"
+description = "share a video queue with your friends"
+readme = "README.md"
+requires-python = ">=3.11"
+authors=[{"name" = "Douile", "email" = "douile@douile.com"}]
+maintainers=[{"name" = "Douile", "email" = "douile@douile.com"}]
+license="AGPL-3.0-or-later"
+dependencies = [
+    "mpv>=1",
+    "yt-dlp[default]>=2023",
+]
+
+[project.urls]
+Repository="https://github.com/Douile/friends-queue"
+
+[build-system]
+requires = ["uv_build>=0.9.9,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv_build]
+package-data = {""= ["*.css"]}
+
+[dependency-groups]
+dev = [
+    "black>=25.11.0",
+    "pylint>=4.0.3",
+]
